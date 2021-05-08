@@ -14,17 +14,32 @@ class EventSystem:
         """
         Registra um método para responder a mensagens do tipo indicado pelo parâmetro message.
         """
-
-        pass
+        message = message + str(id(sender)) if sender is not None else message
+        
+        if message in self.__registered_methods:
+            if callback not in self.__registered_methods[message]:
+                self.__registered_methods[message].append(callback)
+        else:
+            callback_list: List[Callable] = list()
+            callback_list.append(callback)
+            self.__registered_methods[message] = callback
 
     def stop_listening(self, message: str, callback: Callable, sender: Any = None):
         """
         Remove o interesse de um método pela mensagem identificada pelo parâmetro message.
         """
-        pass
+        message = message + str(id(sender)) if sender is not None else message
+        if message in self.__registered_methods:
+            if callback in self.__registered_methods:
+                self.__registered_methods[message].remove(callback)
+                if not self.__registered_methods[message]:
+                    del self.__registered_methods[message]
 
-    def broadcast(self, message: str, *args: List[Any], **kwargs: Dict[str, Any]):
+    def broadcast(self, message: str, sender: Any = None, *args: List[Any], **kwargs: Dict[str, Any]):
         """
         Executa todos os métodos que tem interesse na mensagem identificada pelo parâmetro message.
         """
-        pass
+        message = message + str(id(sender)) if sender is not None else message
+        if message in self.__registered_methods:
+            for callback in self.__registered_methods[message]:
+                callback(*args, **kwargs)
