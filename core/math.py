@@ -2,6 +2,10 @@ from __future__ import annotations
 
 class Vector2:
 
+    """
+    Esta classe representa vetores de duas dimensões.
+    """
+
     def __init__(self, x: float, y: float):
         self.x = x;
         self.y = y
