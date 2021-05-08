@@ -2,10 +2,9 @@ import time
 import pygame
 import pygame.display
 import pygame.event
-
+import core.event_system
 
 class Clock:
-
     """
     Essa classe representa um relógio que pode ser pausado. Útil para realizar animações.
     """
@@ -31,21 +30,20 @@ class Clock:
         else:
             return time.perf_counter() - self.__pause_amount
 
-
-
 class Application:
 
     """
     Essa classe é um contêiner para todos os outros objetos da aplicação. Ela é responsável por gerenciar e inicializar todos os objetos do jogo.
     """
-
     def __init__(self, 
                 display: pygame.Surface,
-                clock: Clock):
+                clock: Clock,
+                event_system: core.event_system.EventSystem):
         
         self.__display: pygame.Surface = display
         self.__clock: Clock = clock
         self.__run_application: bool = True
+        self.__event_System = event_system
 
     def process_events(self):
         for event in pygame.event.get():
