@@ -5,7 +5,7 @@ import pygame.event
 import pygame.image
 import core.event_system
 import core.entity_system
-from typing import Dict
+from typing import Callable, Dict, List
 
 class Clock:
     """
@@ -67,6 +67,40 @@ class ImageLoader:
     def get_image(self, alias: str) -> pygame.Surface:
         return self.__loaded_images[alias]
 
+
+
+class Keyboard:
+
+    KEY_PRESSED = "press"
+    KEY_RELEASE = "release"
+
+    def __init__(self, event_system: core.event_system.EventSystem):
+        self.__event_system = event_system
+
+    def register_callback(self, key: int, mode: str, callback: Callable):
+        self.__event_system.listen(str(key) + mode, callback)
+    
+    def remove_callback(self, key: int, mode: str, callback: Callable):
+        self.__event_system.stop_listening(str(key) + mode, callback)
+
+    def get_state(self) -> List[bool]:
+        return pygame.key.get_pressed()
+
+class Mouse:
+
+    def __init__(self, event_system: core.event_system.EventSystem):
+        self.__event_system = event_system
+    
+    def register_callback(self, mouse_key: int, mode: str, callback: Callable):
+        self.__event_system.listen(str(mouse_key) + mode, callback)
+
+    def remove_callback(self, mouse_key: int, mode: str, callback: Callable):
+        self.__event_system.stop_listening(str(mouse_key) + mode, callback)
+
+    def get_state(self):
+        return pygame.mouse.get_pressed()
+
+
 class Application:
 
     """
@@ -78,7 +112,9 @@ class Application:
                 event_system: core.event_system.EventSystem,
                 world: core.entity_system.World,
                 app_timing_data: TimingData,
-                img_loader: ImageLoader):
+                img_loader: ImageLoader,
+                keyboard: Keyboard,
+                mouse: Mouse):
         
         self.__display: pygame.Surface = display
         self.__clock: Clock = clock
@@ -92,6 +128,9 @@ class Application:
         self.__image_loader = img_loader
 
         self.load_standard_assets()
+
+        self.__keyboard = keyboard
+        self.__mouse = mouse
 
     def load_standard_assets(self):
         self.__image_loader.load_image("assets/images/debug.png", "default")
@@ -142,3 +181,11 @@ class Application:
     @property
     def display(self) -> pygame.Surface:
         return self.__display
+
+    @property
+    def keyboard(self) -> Keyboard:
+        return self.__keyboard
+
+    @property
+    def mouse(self) -> Mouse:
+        return self.__mouse
