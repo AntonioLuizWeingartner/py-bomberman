@@ -120,7 +120,7 @@ class Application:
         self.__clock: Clock = clock
         self.__run_application: bool = True
         self.__paused: bool = False
-        self.__event_System = event_system
+        self.__event_system = event_system
         self.__world: core.entity_system.World = world
         self.__world.set_app(self)
 
@@ -149,7 +149,11 @@ class Application:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.__run_application = False
-    
+            elif event.type == pygame.KEYDOWN:
+                self.__event_system.broadcast(str(event.key) + Keyboard.KEY_PRESSED)
+            elif event.type == pygame.KEYUP:
+                self.__event_system.broadcast(str(event.key) + Keyboard.KEY_RELEASE)
+
     def update_game_world(self):
         if self.__paused is False:
             self.__world.update()

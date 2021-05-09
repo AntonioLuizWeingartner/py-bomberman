@@ -36,6 +36,14 @@ class Component:
     def app(self) -> core.app.Application:
         return self.__owner.app
 
+    @property
+    def mouse(self) -> core.app.Mouse:
+        return self.__owner.app.mouse
+
+    @property
+    def keyboard(self) -> core.app.Keyboard:
+        return self.__owner.app.keyboard
+
 class ScriptableComponent(Component, abc.ABC):
 
     @abc.abstractmethod

@@ -16,5 +16,7 @@ def create_app(window_size: Tuple[int, int], frame_rate = 60) -> core.app.Applic
     world = core.entity_system.World()
     timing_data = core.app.TimingData(frame_rate)
     img_loader = core.app.ImageLoader()
-    app = core.app.Application(display, clock, evt_sys, world, timing_data, img_loader)
+    keyboard = core.app.Keyboard(evt_sys)
+    mouse = core.app.Mouse(evt_sys)
+    app = core.app.Application(display, clock, evt_sys, world, timing_data, img_loader, keyboard, mouse)
     return app

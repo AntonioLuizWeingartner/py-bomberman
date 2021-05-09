@@ -22,7 +22,7 @@ class EventSystem:
         else:
             callback_list: List[Callable] = list()
             callback_list.append(callback)
-            self.__registered_methods[message] = callback
+            self.__registered_methods[message] = callback_list
 
     def stop_listening(self, message: str, callback: Callable, sender: Any = None):
         """
