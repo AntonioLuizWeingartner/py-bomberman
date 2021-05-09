@@ -1,16 +1,19 @@
 from __future__ import annotations
+from ast import walk
 from core.app import Keyboard
 import pygame
 import core.entity_system
 import core.event_system
 import core.core_components
+import core.app
+import functools
 from typing import List
 from core.math import Vector2
 
 class GridCell:
     
-    def __init__(self, img: pygame.Surface, grid_position: Vector2, event_system: core.event_system.EventSystem) -> None:
-        self.__walkable: bool = True
+    def __init__(self, img: pygame.Surface, grid_position: Vector2, event_system: core.event_system.EventSystem, walkable: bool = True) -> None:
+        self.__walkable: bool = walkable
         self.__cell_image: pygame.Suface = img
         self.__event_system: core.event_system.EventSystem = event_system
         self.__grid_position = grid_position
@@ -32,6 +35,8 @@ class GridCell:
         self.__cell_image = img
         self.__event_system.broadcast("cell_img_changed", self, self.__grid_position)
 
+
+
 class GameGrid(core.entity_system.ScriptableComponent):
 
     def on_init(self):
@@ -49,7 +54,11 @@ class GameGrid(core.entity_system.ScriptableComponent):
         for x in range(self.__grid_size.x):
             column: List[GridCell] = list()
             for y in range(self.__grid_size.y):
-                cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system)
+                if (x+1) % 2 == 0 and (y+1) % 2 == 0:
+                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, False)
+                else:
+                    cell = GridCell(self.app.image_loader.get_image("dirt"), Vector2(x,y), self.event_system)   
+
                 self.event_system.listen("cell_img_changed", self.update_grid_img, sender=cell)
                 column.append(cell)
 
@@ -87,6 +96,10 @@ class GameGrid(core.entity_system.ScriptableComponent):
     def dimensions(self) -> Vector2:
         return Vector2(self.__grid_size.x*self.__cell_size.x, self.__grid_size.y*self.__cell_size.y)
 
+    @property
+    def cells(self) -> List[List[GridCell]]:
+        return self.__grid_cells
+
 class GridAgent(core.entity_system.ScriptableComponent):
 
     def on_init(self):
@@ -94,7 +107,7 @@ class GridAgent(core.entity_system.ScriptableComponent):
         self.__movement_disabled: bool = False
         self.__target_position: Vector2 = Vector2(0,0)
         self.__mov_delta: Vector2 = Vector2(0,0)
-        self.keyboard.register_callback(pygame.K_DOWN, Keyboard.KEY_PRESSED, self.move_down)
+
 
     def set_grid(self, grid: GameGrid, initial_pos: Vector2):
         self.__grid: GameGrid = grid
@@ -127,31 +140,15 @@ class GridAgent(core.entity_system.ScriptableComponent):
 
         if target_grid_pos.x > self.__grid_size.x - 1 or target_grid_pos.x < 0 or target_grid_pos.y > self.__grid_size.y - 1 or self.__grid_size.y < 0:
             return
+        
+        if self.__grid.cells[target_grid_pos.x][target_grid_pos.y].walkable is False:
+            return
+        
+
         self.__grid_pos = target_grid_pos
-
-    def move_down(self):
-        if self.__movement_disabled:
-            return
-
-        if self.__grid_pos.y == self.__grid_size.y - 1:
-            return
-
-        self.__grid_pos.y += 1
         self.__target_position = self.compute_world_position(self.__grid_pos)
-        self.__mov_delta = (self.__target_position - self.transform.position)/30
+        self.__mov_delta = (self.__target_position - self.transform.position)/10
         self.__movement_disabled = True
-
-    def move_up(self):
-        if self.__movement_disabled:
-            return
-
-    def move_left(self):
-        if self.__movement_disabled:
-            return
-
-    def move_right(self):
-        if self.__movement_disabled:
-            return
 
     def update(self):
         self.transform.position += self.__mov_delta
@@ -159,16 +156,19 @@ class GridAgent(core.entity_system.ScriptableComponent):
             self.transform.position = self.__target_position
             self.__movement_disabled = False
             self.__mov_delta = Vector2(0,0)
-    
-class AIController(core.entity_system.ScriptableComponent):
-    
-    def update(self):
-        pass
 
-class PlayerController(core.entity_system.ScriptableComponent):
 
-    def update(self):
-        pass
+class AIAgent(GridAgent):
+    pass
+
+class Player(GridAgent):
+
+    def on_init(self):
+        super().on_init()
+        self.keyboard.register_callback(pygame.K_DOWN, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(0, 1)))
+        self.keyboard.register_callback(pygame.K_UP, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(0, -1)))
+        self.keyboard.register_callback(pygame.K_LEFT, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(-1, 0)))
+        self.keyboard.register_callback(pygame.K_RIGHT, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(1, 0)))
 
 class GameManager(core.entity_system.ScriptableComponent):
 
