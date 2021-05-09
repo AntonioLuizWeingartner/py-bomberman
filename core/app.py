@@ -110,12 +110,22 @@ class Application:
         if self.__paused is False:
             self.__world.update()
 
+    def draw_game_world(self):
+        self.__world.draw()
+
     def start(self):
         while self.__run_application:
             self.process_events()
-            if self.__clock.now() - self.__timing_data.last_frame_time_point >= self.__timing_data.frame_period:
-                pass
-
+            if time.perf_counter() - self.__timing_data.last_frame_time_point >= self.__timing_data.frame_period:
+                self.__timing_data.last_frame_time_point = time.perf_counter()
+                self.update_game_world()
+                self.__display.fill((0,0,0))
+                self.draw_game_world()
+                pygame.display.flip()
     @property
     def event_system(self) -> core.event_system.EventSystem:
-        return self.__event_System
+        return self.__event_System 
+    
+    @property
+    def world(self) -> core.entity_system.World:
+        return self.__world

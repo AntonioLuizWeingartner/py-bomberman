@@ -85,7 +85,7 @@ class Entity:
             target_list = self.__scriptables
         elif issubclass(component_type, DrawableComponent):
             target_list = self.__drawables
-        elif issubclass(component_type):
+        elif issubclass(component_type, Component):
             target_list = self.__components
         else:
             raise InvalidComponentTypeError()
@@ -146,7 +146,7 @@ class World:
 
     def add_entity(self) -> Entity:
         ent = Entity(self)
-        self.__entities.add(ent)
+        self.__entities.append(ent)
         return ent
 
     def remove_entity(self, entity_instance: Entity):
