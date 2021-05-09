@@ -1,8 +1,8 @@
+from __future__ import annotations
 import abc
 import core.app
 import core.event_system
 import core.math
-from __future__ import annotations
 from typing import Optional, Type, List
 
 class Component:

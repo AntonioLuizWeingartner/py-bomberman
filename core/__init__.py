@@ -14,5 +14,6 @@ def create_app(window_size: Tuple[int, int]) -> core.app.Application:
     clock = core.app.Clock()
     evt_sys = core.event_system.EventSystem()
     world = core.entity_system.World()
-    app = core.app.Application(display, clock, evt_sys, world)
+    timing_data = core.app.TimingData(60)
+    app = core.app.Application(display, clock, evt_sys, world, timing_data)
     return app
