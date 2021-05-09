@@ -74,10 +74,10 @@ class Entity:
 
     def __init__(self, world: World) -> None:
         self.__world = world
-        self.__transform = None
         self.__components: List[Component] = list()
         self.__scriptables: List[ScriptableComponent] = list()
         self.__drawables: List[DrawableComponent] = list()
+        self.__transform = self.add_component(Transform)
 
     def __get_target_list(self, component_type: Type) -> List[Component]:
         target_list: List[Component] = None

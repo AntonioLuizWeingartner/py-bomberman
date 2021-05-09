@@ -110,8 +110,6 @@ class Application:
         if self.__paused is False:
             self.__world.update()
 
-
-
     def start(self):
         while self.__run_application:
             self.process_events()
