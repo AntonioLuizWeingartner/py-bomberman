@@ -62,7 +62,9 @@ class ImageLoader:
         self.__loaded_images: Dict[str, pygame.Surface] = dict()
 
     def load_image(self, path: str, alias: str):
-        self.__loaded_images[alias] = pygame.image.load(path)
+        img = pygame.image.load(path)
+        img.convert_alpha()
+        self.__loaded_images[alias] = img 
     
     def get_image(self, alias: str) -> pygame.Surface:
         return self.__loaded_images[alias]
@@ -83,7 +85,8 @@ class Keyboard:
     def remove_callback(self, key: int, mode: str, callback: Callable):
         self.__event_system.stop_listening(str(key) + mode, callback)
 
-    def get_state(self) -> List[bool]:
+    @property
+    def state(self) -> List[bool]:
         return pygame.key.get_pressed()
 
 class Mouse:
@@ -172,7 +175,7 @@ class Application:
                 pygame.display.flip()
     @property
     def event_system(self) -> core.event_system.EventSystem:
-        return self.__event_System 
+        return self.__event_system 
     
     @property
     def world(self) -> core.entity_system.World:

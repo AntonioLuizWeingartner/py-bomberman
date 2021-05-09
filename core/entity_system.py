@@ -118,7 +118,7 @@ class Entity:
     def get_component(self, component_type: Type) -> Component:
         target_list = self.__get_target_list(component_type)
         for component in target_list:
-            if component is component_type:
+            if type(component) is component_type:
                 return component
         raise ComponentNotFoundError()
 
