@@ -2,6 +2,7 @@ import pygame
 import pygame.display
 import core.app
 import core.event_system
+import core.entity_system
 from typing import Tuple
 
 def create_app(window_size: Tuple[int, int]) -> core.app.Application:
@@ -12,5 +13,6 @@ def create_app(window_size: Tuple[int, int]) -> core.app.Application:
     display = pygame.display.set_mode(window_size)
     clock = core.app.Clock()
     evt_sys = core.event_system.EventSystem()
-    app = core.app.Application(display, clock, evt_sys)
+    world = core.entity_system.World()
+    app = core.app.Application(display, clock, evt_sys, world)
     return app

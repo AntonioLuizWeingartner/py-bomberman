@@ -4,6 +4,7 @@ import pygame.display
 import pygame.event
 import core.event_system
 
+
 class Clock:
     """
     Essa classe representa um relógio que pode ser pausado. Útil para realizar animações.
@@ -38,12 +39,15 @@ class Application:
     def __init__(self, 
                 display: pygame.Surface,
                 clock: Clock,
-                event_system: core.event_system.EventSystem):
+                event_system: core.event_system.EventSystem,
+                world: core.entity_system.World):
         
         self.__display: pygame.Surface = display
         self.__clock: Clock = clock
         self.__run_application: bool = True
         self.__event_System = event_system
+        self.__world = world
+        self.__world.set_app(self)
 
     def process_events(self):
         for event in pygame.event.get():
@@ -54,3 +58,6 @@ class Application:
         while self.__run_application:
             self.process_events()
     
+    @property
+    def event_system(self) -> core.event_system.EventSystem:
+        return self.__event_System
