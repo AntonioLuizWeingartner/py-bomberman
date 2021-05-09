@@ -96,12 +96,14 @@ class Entity:
         target_list = self.__get_target_list(component_type)
         cp = component_type(self)
         target_list.append(cp)
+        cp.on_init()
         return cp
 
     def remove_component(self, component_instance: Component):
         target_list = self.__get_target_list(type(component_instance))
         if component_instance in target_list:
             target_list.remove(component_instance)
+            component_instance.on_remove()
         else:
             raise ComponentNotFoundError()
 

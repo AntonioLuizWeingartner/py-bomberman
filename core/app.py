@@ -91,6 +91,11 @@ class Application:
         self.__timing_data = app_timing_data
         self.__image_loader = img_loader
 
+        self.load_standard_assets()
+
+    def load_standard_assets(self):
+        self.__image_loader.load_image("assets/images/debug.png", "default")
+        
     def pause(self):
         if self.__paused is False:
             self.__paused = True
@@ -117,7 +122,6 @@ class Application:
         while self.__run_application:
             self.process_events()
             if time.perf_counter() - self.__timing_data.last_frame_time_point >= self.__timing_data.frame_period:
-                print(self.__timing_data.frame_period)
                 self.__timing_data.last_frame_time_point = time.perf_counter()
                 self.update_game_world()
                 self.__display.fill((0,0,0))
