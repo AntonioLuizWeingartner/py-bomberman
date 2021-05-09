@@ -29,8 +29,8 @@ class GridCell:
 
     @image.setter
     def image(self, img: pygame.Surface):
-        self.__event_system.broadcast("cell_img_changed", self, self.__grid_position)
         self.__cell_image = img
+        self.__event_system.broadcast("cell_img_changed", self, self.__grid_position)
 
 class GameGrid(core.entity_system.ScriptableComponent):
 
@@ -57,7 +57,8 @@ class GameGrid(core.entity_system.ScriptableComponent):
 
         self.generate_grid_image()
         self.centralize_grid_in_screen()
-        
+        self.__grid_cells[0][0].image = self.app.image_loader.get_image("dirt")
+
     def generate_grid_image(self):
         for x in range(self.__grid_size.x):
             for y in range(self.__grid_size.y):
@@ -69,7 +70,10 @@ class GameGrid(core.entity_system.ScriptableComponent):
         self.transform.position = Vector2(self.app.display.get_width()/2, self.app.display.get_height()/2)
 
     def update_grid_img(self, cell_position: Vector2):
-        pass
+        x = cell_position.x
+        y = cell_position.y
+        img = pygame.transform.scale(self.__grid_cells[x][y].image, self.__cell_size.tuple)
+        self.__grid_image.blit(img, (x*self.__cell_size.x, y*self.__cell_size.y))
 
     @property
     def grid_size(self) -> Vector2:

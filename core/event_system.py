@@ -15,7 +15,6 @@ class EventSystem:
         Registra um método para responder a mensagens do tipo indicado pelo parâmetro message.
         """
         message = message + str(id(sender)) if sender is not None else message
-        
         if message in self.__registered_methods:
             if callback not in self.__registered_methods[message]:
                 self.__registered_methods[message].append(callback)
@@ -35,7 +34,7 @@ class EventSystem:
                 if not self.__registered_methods[message]:
                     del self.__registered_methods[message]
 
-    def broadcast(self, message: str, sender: Any = None, *args: List[Any], **kwargs: Dict[str, Any]):
+    def broadcast(self, message: str, sender: Any = None, *args: List[Any], **kwargs):
         """
         Executa todos os métodos que tem interesse na mensagem identificada pelo parâmetro message.
         """
