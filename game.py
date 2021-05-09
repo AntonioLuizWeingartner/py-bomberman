@@ -16,4 +16,9 @@ tabuleiro.add_component(core.core_components.SpriteRenderer)
 gg: core.game_components.GameGrid = tabuleiro.add_component(core.game_components.GameGrid)
 gg.generate_grid(Vector2(25,25), Vector2(32,32))
 
+agent = app.world.add_entity()
+agent.add_component(core.core_components.SpriteRenderer)
+agent: core.game_components.GridAgent = agent.add_component(core.game_components.GridAgent)
+agent.set_grid(gg, Vector2(0,0))
+
 app.start()

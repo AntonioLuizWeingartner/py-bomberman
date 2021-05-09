@@ -83,8 +83,37 @@ class GameGrid(core.entity_system.ScriptableComponent):
     def cell_size(self) -> Vector2:
         return self.__cell_size
 
+    @property
+    def dimensions(self) -> Vector2:
+        return Vector2(self.__grid_size.x*self.__cell_size.x, self.__grid_size.y*self.__cell_size.y)
+
 class GridAgent(core.entity_system.ScriptableComponent):
-    
+
+    def on_init(self):
+        self.__sprite_renderer: core.core_components.SpriteRenderer = self.owner.get_component(core.core_components.SpriteRenderer)
+
+    def set_grid(self, grid: GameGrid, initial_pos: Vector2):
+        self.__grid: GameGrid = grid
+        self.__grid_pos: Vector2 = initial_pos
+        self.__grid_size: Vector2 = grid.grid_size
+        self.__cell_size: Vector2 = grid.cell_size
+        self.__agent_img: pygame.Surface = pygame.Surface(self.__cell_size.tuple)
+        self.__agent_img.fill((255,255,255))
+        self.__sprite_renderer.sprite = self.__agent_img
+        self.place_agent()
+
+    def place_agent(self):
+        self.transform.position = self.compute_world_position(self.__grid_pos)
+
+    def compute_world_position(self, grid_position: Vector2) -> Vector2:
+        offset = self.__grid.transform.position - (self.__grid.dimensions/2)
+        world_position = Vector2(0,0)
+        world_position.x = grid_position.x*self.__cell_size.x
+        world_position.y = grid_position.y*self.__cell_size.y
+        world_position += offset
+        world_position += self.__cell_size/2
+        return world_position
+
     def update(self):
         pass
 

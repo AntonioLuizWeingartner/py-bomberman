@@ -34,7 +34,11 @@ class Vector2:
         self.x *= other
         self.y *= other
         return self
-    
+
+    def __truediv__(self, other: float):
+        return Vector2(self.x/other, self.y/other)
+
+
     def __repr__(self) -> str:
         return "Vector2 (x={}, y={})".format(self.x, self.y)
     
