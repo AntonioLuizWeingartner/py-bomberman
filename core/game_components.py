@@ -1,5 +1,6 @@
 from __future__ import annotations
 from ast import walk
+from sys import int_info
 from core.app import Keyboard
 import pygame
 import core.entity_system
@@ -12,8 +13,9 @@ from core.math import Vector2
 
 class GridCell:
     
-    def __init__(self, img: pygame.Surface, grid_position: Vector2, event_system: core.event_system.EventSystem, walkable: bool = True) -> None:
+    def __init__(self, img: pygame.Surface, grid_position: Vector2, event_system: core.event_system.EventSystem, walkable: bool = True, destructible: bool = False) -> None:
         self.__walkable: bool = walkable
+        self.__destructible: bool = destructible
         self.__cell_image: pygame.Suface = img
         self.__event_system: core.event_system.EventSystem = event_system
         self.__grid_position = grid_position
@@ -25,6 +27,14 @@ class GridCell:
     @walkable.setter
     def walkable(self, val: bool):
         self.__walkable = val
+
+    @property
+    def destructible(self) -> bool:
+        return self.__destructible
+    
+    @destructible.setter
+    def destructible(self, val: bool):
+        self.__destructible = val
 
     @property
     def image(self) -> pygame.Surface:
@@ -127,6 +137,27 @@ class GridEntity(core.entity_system.ScriptableComponent):
         world_position += self._cell_size/2
         return world_position
 
+class Bomb(GridEntity):
+
+    def on_init(self):
+        super().on_init()
+        self.__fuse_time = self.app.clock.now() + 5
+
+    def set_grid(self, grid: GameGrid, initial_pos: Vector2):
+        super().set_grid(grid, initial_pos)
+        self._grid.cells[initial_pos.x][initial_pos.y].walkable = False
+
+    def set_owner(self, agent: GridAgent):
+        self.__owner = agent
+
+    def on_explode(self):
+        self._grid.cells[self._grid_pos.x][self._grid_pos.y].walkable = True
+        self.world.mark_entity_for_deletion(self.owner)
+
+    def update(self):
+        if self.app.clock.now() >= self.__fuse_time:
+            self.on_explode()
+
 class GridAgent(GridEntity):
 
     def on_init(self):
@@ -134,6 +165,8 @@ class GridAgent(GridEntity):
         self._movement_disabled: bool = False
         self._target_position: Vector2 = Vector2(0,0)
         self._mov_delta: Vector2 = Vector2(0,0)
+        self._fire_power = 1
+        self._bomb_count = 1
 
     def set_grid(self, grid: GameGrid, initial_pos: Vector2):
         super().set_grid(grid, initial_pos)
@@ -162,6 +195,14 @@ class GridAgent(GridEntity):
         self._mov_delta = (self._target_position - self.transform.position)/30
         self._movement_disabled = True
 
+    def place_bomb(self):
+        bomb_entity = self.world.add_entity()
+        bomb_entity.add_component(core.core_components.SpriteRenderer)
+        bomb_cp: Bomb = bomb_entity.add_component(Bomb)
+        bomb_cp.set_grid(self._grid, self._grid_pos)
+        bomb_cp.set_owner(self)
+
+
     def update(self):
         self.transform.position += self._mov_delta
         if (self.transform.position - self._target_position).squared_mag <= 0.15:
@@ -181,6 +222,7 @@ class Player(GridAgent):
         self.keyboard.register_callback(pygame.K_UP, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(0, -1)))
         self.keyboard.register_callback(pygame.K_LEFT, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(-1, 0)))
         self.keyboard.register_callback(pygame.K_RIGHT, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(1, 0)))
+        self.keyboard.register_callback(pygame.K_SPACE, Keyboard.KEY_PRESSED, functools.partial(self.place_bomb))
 
 class GameManager(core.entity_system.ScriptableComponent):
 

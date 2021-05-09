@@ -196,3 +196,7 @@ class Application:
     @property
     def mouse(self) -> Mouse:
         return self.__mouse
+    
+    @property
+    def clock(self) -> Clock:
+        return self.__clock

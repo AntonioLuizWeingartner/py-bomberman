@@ -87,6 +87,8 @@ class Entity:
         self.__drawables: List[DrawableComponent] = list()
         self.__transform = self.add_component(Transform)
 
+
+
     def __get_target_list(self, component_type: Type) -> List[Component]:
         target_list: List[Component] = None
         if issubclass(component_type, ScriptableComponent):
@@ -150,6 +152,11 @@ class World:
     def __init__(self):
         self.__app: core.app.Application = None
         self.__entities: List[Entity] = list()
+        self.__deletion_list: List[Entity] = list()
+
+    def mark_entity_for_deletion(self, entity: Entity):
+        self.__deletion_list.append(entity)
+        
 
     def set_app(self, app: core.app.Application):
         self.__app = app
@@ -166,6 +173,10 @@ class World:
             raise EntityNotFoundError()
     
     def update(self):
+        for entity in self.__deletion_list:
+            self.remove_entity(entity)
+        self.__deletion_list.clear()
+
         for entity in self.__entities:
             entity.update()
     
