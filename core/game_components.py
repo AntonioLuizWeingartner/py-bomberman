@@ -100,62 +100,74 @@ class GameGrid(core.entity_system.ScriptableComponent):
     def cells(self) -> List[List[GridCell]]:
         return self.__grid_cells
 
-class GridAgent(core.entity_system.ScriptableComponent):
+
+class GridEntity(core.entity_system.ScriptableComponent):
+    pass
 
     def on_init(self):
-        self.__sprite_renderer: core.core_components.SpriteRenderer = self.owner.get_component(core.core_components.SpriteRenderer)
-        self.__movement_disabled: bool = False
-        self.__target_position: Vector2 = Vector2(0,0)
-        self.__mov_delta: Vector2 = Vector2(0,0)
-
+        self._sprite_renderer: core.core_components.SpriteRenderer = self.owner.get_component(core.core_components.SpriteRenderer)
 
     def set_grid(self, grid: GameGrid, initial_pos: Vector2):
-        self.__grid: GameGrid = grid
-        self.__grid_pos: Vector2 = initial_pos
-        self.__grid_size: Vector2 = grid.grid_size
-        self.__cell_size: Vector2 = grid.cell_size
-        self.__agent_img: pygame.Surface = pygame.Surface(self.__cell_size.tuple)
-        self.__agent_img.fill((255,255,255))
-        self.__sprite_renderer.sprite = self.__agent_img
-        self.place_agent()
+        self._grid: GameGrid = grid
+        self._grid_pos: Vector2 = initial_pos
+        self._grid_size: Vector2 = grid.grid_size
+        self._cell_size: Vector2 = grid.cell_size
+        self.place_entity()
 
-    def place_agent(self):
-        world_pos = self.compute_world_position(self.__grid_pos)
-        self.__target_position = world_pos
+    def place_entity(self):
+        world_pos = self.compute_world_position(self._grid_pos)
         self.transform.position = world_pos
 
     def compute_world_position(self, grid_position: Vector2) -> Vector2:
-        offset = self.__grid.transform.position - (self.__grid.dimensions/2)
+        offset = self._grid.transform.position - (self._grid.dimensions/2)
         world_position = Vector2(0,0)
-        world_position.x = grid_position.x*self.__cell_size.x
-        world_position.y = grid_position.y*self.__cell_size.y
+        world_position.x = grid_position.x*self._cell_size.x
+        world_position.y = grid_position.y*self._cell_size.y
         world_position += offset
-        world_position += self.__cell_size/2
+        world_position += self._cell_size/2
         return world_position
 
+class GridAgent(GridEntity):
+
+    def on_init(self):
+        self._sprite_renderer: core.core_components.SpriteRenderer = self.owner.get_component(core.core_components.SpriteRenderer)
+        self._movement_disabled: bool = False
+        self._target_position: Vector2 = Vector2(0,0)
+        self._mov_delta: Vector2 = Vector2(0,0)
+
+    def set_grid(self, grid: GameGrid, initial_pos: Vector2):
+        super().set_grid(grid, initial_pos)
+        self._agent_img: pygame.Surface = pygame.Surface(self._cell_size.tuple)
+        self._agent_img.fill((255,255,255))
+        self._sprite_renderer.sprite = self._agent_img
+
+    def place_entity(self):
+        world_pos = self.compute_world_position(self._grid_pos)
+        self._target_position = world_pos
+        self.transform.position = world_pos
+
     def move(self, direction: Vector2):
-        if self.__movement_disabled:
+        if self._movement_disabled:
             return
-        target_grid_pos = self.__grid_pos + direction
+        target_grid_pos = self._grid_pos + direction
 
-        if target_grid_pos.x > self.__grid_size.x - 1 or target_grid_pos.x < 0 or target_grid_pos.y > self.__grid_size.y - 1 or self.__grid_size.y < 0:
+        if target_grid_pos.x > self._grid_size.x - 1 or target_grid_pos.x < 0 or target_grid_pos.y > self._grid_size.y - 1 or target_grid_pos.y < 0:
             return
         
-        if self.__grid.cells[target_grid_pos.x][target_grid_pos.y].walkable is False:
+        if self._grid.cells[target_grid_pos.x][target_grid_pos.y].walkable is False:
             return
         
-
-        self.__grid_pos = target_grid_pos
-        self.__target_position = self.compute_world_position(self.__grid_pos)
-        self.__mov_delta = (self.__target_position - self.transform.position)/10
-        self.__movement_disabled = True
+        self._grid_pos = target_grid_pos
+        self._target_position = self.compute_world_position(self._grid_pos)
+        self._mov_delta = (self._target_position - self.transform.position)/30
+        self._movement_disabled = True
 
     def update(self):
-        self.transform.position += self.__mov_delta
-        if (self.transform.position - self.__target_position).squared_mag <= 0.15:
-            self.transform.position = self.__target_position
-            self.__movement_disabled = False
-            self.__mov_delta = Vector2(0,0)
+        self.transform.position += self._mov_delta
+        if (self.transform.position - self._target_position).squared_mag <= 0.15:
+            self.transform.position = self._target_position
+            self._movement_disabled = False
+            self._mov_delta = Vector2(0,0)
 
 
 class AIAgent(GridAgent):
