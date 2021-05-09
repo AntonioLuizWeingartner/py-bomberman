@@ -15,5 +15,6 @@ def create_app(window_size: Tuple[int, int]) -> core.app.Application:
     evt_sys = core.event_system.EventSystem()
     world = core.entity_system.World()
     timing_data = core.app.TimingData(60)
-    app = core.app.Application(display, clock, evt_sys, world, timing_data)
+    img_loader = core.app.ImageLoader()
+    app = core.app.Application(display, clock, evt_sys, world, timing_data, img_loader)
     return app

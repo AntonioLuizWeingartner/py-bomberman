@@ -2,8 +2,10 @@ import time
 import pygame
 import pygame.display
 import pygame.event
+import pygame.image
 import core.event_system
 import core.entity_system
+from typing import Dict
 
 class Clock:
     """
@@ -54,6 +56,17 @@ class TimingData:
     def target_fps(self) -> float:
         return self.__fps
 
+class ImageLoader:
+
+    def __init__(self):
+        self.__loaded_images: Dict[str, pygame.Surface] = dict()
+
+    def load_image(self, path: str, alias: str):
+        self.__loaded_images[alias] = pygame.image.load(path)
+    
+    def get_image(self, alias: str) -> pygame.Surface:
+        return self.__loaded_images[alias]
+
 class Application:
 
     """
@@ -64,7 +77,8 @@ class Application:
                 clock: Clock,
                 event_system: core.event_system.EventSystem,
                 world: core.entity_system.World,
-                app_timing_data: TimingData):
+                app_timing_data: TimingData,
+                img_loader: ImageLoader):
         
         self.__display: pygame.Surface = display
         self.__clock: Clock = clock
@@ -75,6 +89,7 @@ class Application:
         self.__world.set_app(self)
 
         self.__timing_data = app_timing_data
+        self.__image_loader = img_loader
 
     def pause(self):
         if self.__paused is False:
