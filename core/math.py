@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Tuple
 
 class Vector2:
 
@@ -36,3 +37,7 @@ class Vector2:
     
     def __repr__(self) -> str:
         return "Vector2 (x={}, y={})".format(self.x, self.y)
+    
+    @property
+    def tuple(self) -> Tuple[float, float]:
+        return (self.x, self.y)

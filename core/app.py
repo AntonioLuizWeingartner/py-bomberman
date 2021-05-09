@@ -117,6 +117,7 @@ class Application:
         while self.__run_application:
             self.process_events()
             if time.perf_counter() - self.__timing_data.last_frame_time_point >= self.__timing_data.frame_period:
+                print(self.__timing_data.frame_period)
                 self.__timing_data.last_frame_time_point = time.perf_counter()
                 self.update_game_world()
                 self.__display.fill((0,0,0))
@@ -129,3 +130,11 @@ class Application:
     @property
     def world(self) -> core.entity_system.World:
         return self.__world
+    
+    @property
+    def image_loader(self) -> ImageLoader:
+        return self.__image_loader
+
+    @property
+    def display(self) -> pygame.Surface:
+        return self.__display
