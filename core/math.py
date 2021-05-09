@@ -38,6 +38,9 @@ class Vector2:
     def __truediv__(self, other: float):
         return Vector2(self.x/other, self.y/other)
 
+    @property
+    def squared_mag(self):
+        return self.x**2 + self.y**2
 
     def __repr__(self) -> str:
         return "Vector2 (x={}, y={})".format(self.x, self.y)

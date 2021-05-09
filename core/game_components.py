@@ -1,11 +1,11 @@
 from __future__ import annotations
+from core.app import Keyboard
 import pygame
 import core.entity_system
 import core.event_system
 import core.core_components
 from typing import List
 from core.math import Vector2
-
 
 class GridCell:
     
@@ -91,6 +91,10 @@ class GridAgent(core.entity_system.ScriptableComponent):
 
     def on_init(self):
         self.__sprite_renderer: core.core_components.SpriteRenderer = self.owner.get_component(core.core_components.SpriteRenderer)
+        self.__movement_disabled: bool = False
+        self.__target_position: Vector2 = Vector2(0,0)
+        self.__mov_delta: Vector2 = Vector2(0,0)
+        self.keyboard.register_callback(pygame.K_DOWN, Keyboard.KEY_PRESSED, self.move_down)
 
     def set_grid(self, grid: GameGrid, initial_pos: Vector2):
         self.__grid: GameGrid = grid
@@ -103,7 +107,9 @@ class GridAgent(core.entity_system.ScriptableComponent):
         self.place_agent()
 
     def place_agent(self):
-        self.transform.position = self.compute_world_position(self.__grid_pos)
+        world_pos = self.compute_world_position(self.__grid_pos)
+        self.__target_position = world_pos
+        self.transform.position = world_pos
 
     def compute_world_position(self, grid_position: Vector2) -> Vector2:
         offset = self.__grid.transform.position - (self.__grid.dimensions/2)
@@ -114,9 +120,46 @@ class GridAgent(core.entity_system.ScriptableComponent):
         world_position += self.__cell_size/2
         return world_position
 
-    def update(self):
-        pass
+    def move(self, direction: Vector2):
+        if self.__movement_disabled:
+            return
+        target_grid_pos = self.__grid_pos + direction
 
+        if target_grid_pos.x > self.__grid_size.x - 1 or target_grid_pos.x < 0 or target_grid_pos.y > self.__grid_size.y - 1 or self.__grid_size.y < 0:
+            return
+        self.__grid_pos = target_grid_pos
+
+    def move_down(self):
+        if self.__movement_disabled:
+            return
+
+        if self.__grid_pos.y == self.__grid_size.y - 1:
+            return
+
+        self.__grid_pos.y += 1
+        self.__target_position = self.compute_world_position(self.__grid_pos)
+        self.__mov_delta = (self.__target_position - self.transform.position)/30
+        self.__movement_disabled = True
+
+    def move_up(self):
+        if self.__movement_disabled:
+            return
+
+    def move_left(self):
+        if self.__movement_disabled:
+            return
+
+    def move_right(self):
+        if self.__movement_disabled:
+            return
+
+    def update(self):
+        self.transform.position += self.__mov_delta
+        if (self.transform.position - self.__target_position).squared_mag <= 0.15:
+            self.transform.position = self.__target_position
+            self.__movement_disabled = False
+            self.__mov_delta = Vector2(0,0)
+    
 class AIController(core.entity_system.ScriptableComponent):
     
     def update(self):

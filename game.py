@@ -14,7 +14,7 @@ app.image_loader.load_image("assets/images/dirt.jpg", "dirt")
 tabuleiro = app.world.add_entity()
 tabuleiro.add_component(core.core_components.SpriteRenderer)
 gg: core.game_components.GameGrid = tabuleiro.add_component(core.game_components.GameGrid)
-gg.generate_grid(Vector2(25,25), Vector2(32,32))
+gg.generate_grid(Vector2(20,20), Vector2(32,32))
 
 agent = app.world.add_entity()
 agent.add_component(core.core_components.SpriteRenderer)
