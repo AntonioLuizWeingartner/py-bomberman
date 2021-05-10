@@ -1,6 +1,7 @@
 from __future__ import annotations
-from ast import walk
-from sys import int_info
+import enum
+import time
+from pygame import sprite
 from core.app import Keyboard
 import pygame
 import core.entity_system
@@ -8,7 +9,7 @@ import core.event_system
 import core.core_components
 import core.app
 import functools
-from typing import List
+from typing import List, Optional
 from core.math import Vector2
 
 class GridCell:
@@ -45,8 +46,6 @@ class GridCell:
         self.__cell_image = img
         self.__event_system.broadcast("cell_img_changed", self, self.__grid_position)
 
-
-
 class GameGrid(core.entity_system.ScriptableComponent):
 
     def on_init(self):
@@ -60,20 +59,24 @@ class GameGrid(core.entity_system.ScriptableComponent):
         self.__cell_size = cell_size
         self.__grid_cells: List[List[GridCell]] = list()
         self.__grid_image: pygame.Surface = pygame.Surface((grid_size.x*cell_size.x, grid_size.y * cell_size.y))
+        self.__grid_bombs: List[List[Optional[Bomb]]] = list()
 
         for x in range(self.__grid_size.x):
             column: List[GridCell] = list()
+            bomb_column: List[Optional[Bomb]] = list()
             for y in range(self.__grid_size.y):
                 if (x+1) % 2 == 0 and (y+1) % 2 == 0:
-                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, False)
+                    cell = GridCell(self.app.image_loader.get_image("ob"), Vector2(x,y), self.event_system, False, False)
                 else:
-                    cell = GridCell(self.app.image_loader.get_image("dirt"), Vector2(x,y), self.event_system)   
+                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, False, True)   
 
                 self.event_system.listen("cell_img_changed", self.update_grid_img, sender=cell)
                 column.append(cell)
+                bomb_column.append(None)
 
             self.__grid_cells.append(column)
-
+            self.__grid_bombs.append(bomb_column)
+        self.__grid_cells[0][0].image = self.app.image_loader.get_image("dirt")
         self.generate_grid_image()
         self.centralize_grid_in_screen()
         self.__grid_cells[0][0].image = self.app.image_loader.get_image("dirt")
@@ -110,6 +113,9 @@ class GameGrid(core.entity_system.ScriptableComponent):
     def cells(self) -> List[List[GridCell]]:
         return self.__grid_cells
 
+    @property
+    def bombs(self) -> List[List[Optional[Bomb]]]:
+        return self.__grid_bombs
 
 class GridEntity(core.entity_system.ScriptableComponent):
     pass
@@ -137,22 +143,199 @@ class GridEntity(core.entity_system.ScriptableComponent):
         world_position += self._cell_size/2
         return world_position
 
+class Direction(enum.Enum):
+    SOUTH = 0
+    NORTH = 1
+    WEST = 2
+    EAST = 3
+    CENTER = 4
+
+class BounceCounter:
+
+    def __init__(self, max_value: int, initial_value: int):
+        self.__counter = initial_value
+        self.__max = max_value
+        self.__min = initial_value
+        self.__direction = True
+        self.__first_iteration = True
+
+    def update(self) -> int:
+        if self.__first_iteration:
+            self.__first_iteration = False
+            return self.__min
+
+        if self.__direction:
+            self.__counter += 1
+            if self.__counter == self.__max:
+                self.__direction = False
+        else:
+            self.__counter -= 1
+            if self.__counter == self.__min:
+                self.__direction = True
+        return self.__counter
+
+class Explosion(core.entity_system.ScriptableComponent):
+
+    def on_init(self):
+        self.__remove_time_point = time.perf_counter() + 3
+        self.__last_frame = 0
+        self.__frame_duration = 0.08
+        self.__counter = BounceCounter(3,0)
+        self.__max_frame_count = 8
+        self.__frame_count = 0
+    def set_data(self, spr: core.core_components.SpriteRenderer, sprites: List[pygame.Surface]):
+        self.__sprites = sprites
+        self.__spr = spr
+
+    def update(self):
+        if (time.perf_counter() - self.__last_frame) >= self.__frame_duration:
+            self.__last_frame = time.perf_counter()
+            self.__spr.sprite = self.__sprites[self.__counter.update()]
+            self.__frame_count += 1
+            
+        if self.__frame_count > self.__max_frame_count:
+            self.world.mark_entity_for_deletion(self.owner)
+            
+
 class Bomb(GridEntity):
 
     def on_init(self):
         super().on_init()
-        self.__fuse_time = self.app.clock.now() + 5
+        self.__fuse_time = self.app.clock.now() + 3
+        self.__frame_duration = 0.1
 
     def set_grid(self, grid: GameGrid, initial_pos: Vector2):
         super().set_grid(grid, initial_pos)
         self._grid.cells[initial_pos.x][initial_pos.y].walkable = False
+        self._grid.bombs[initial_pos.x][initial_pos.y] = self
 
     def set_owner(self, agent: GridAgent):
         self.__owner = agent
 
-    def on_explode(self):
+    def create_explosion(self, direction: Direction, pos: Vector2, end: bool = False):
+        sprites: pygame.Surface = None
+
+        if end:
+            if direction == direction.NORTH:
+                sprites = self.app.image_loader.get_sheet("explosions")[3]
+            elif direction == direction.SOUTH:
+                sprites = self.app.image_loader.get_sheet("explosions")[4]
+            elif direction == direction.EAST:
+                sprites = self.app.image_loader.get_sheet("explosions")[5]
+            elif direction == direction.WEST:
+                sprites = self.app.image_loader.get_sheet("explosions")[6]
+        else:
+            if direction == Direction.CENTER:
+                sprites = self.app.image_loader.get_sheet("explosions")[0]
+            elif direction == Direction.EAST or direction == Direction.WEST:
+                sprites = self.app.image_loader.get_sheet("explosions")[2]
+            elif direction == Direction.NORTH or direction == Direction.SOUTH:
+                sprites = self.app.image_loader.get_sheet("explosions")[1]
+
+        exp_entity = self.world.add_entity()
+        spr = exp_entity.add_component(core.core_components.SpriteRenderer)
+        exp_entity.transform.position = self.compute_world_position(pos)
+        exp_cp = exp_entity.add_component(Explosion)
+        exp_cp.set_data(spr, sprites)
+
+    def on_explode(self, incoming_direction: Optional[Direction] = None):
+        self.event_system.broadcast("bomb_exploded", sender=self.__owner)
         self._grid.cells[self._grid_pos.x][self._grid_pos.y].walkable = True
+        self._grid.bombs[self._grid_pos.x][self._grid_pos.y] = None
         self.world.mark_entity_for_deletion(self.owner)
+        firepower = self.__owner.firepower
+
+
+        expand_east: bool = True if incoming_direction != Direction.EAST else False
+        expand_west: bool = True if incoming_direction != Direction.WEST else False
+        expand_north: bool = True if incoming_direction != Direction.NORTH else False
+        expand_south: bool = True if incoming_direction != Direction.SOUTH else False
+
+        self.create_explosion(Direction.CENTER, self._grid_pos)
+
+        for val in range(1,firepower+1):
+            final_iteration = val == firepower
+            if expand_west:
+                target_x = self._grid_pos.x - val
+                if target_x >= 0:
+                    target_cell: GridCell = self._grid.cells[target_x][self._grid_pos.y]
+                    target_bomb: Bomb = self._grid.bombs[target_x][self._grid_pos.y]
+                    if target_cell.destructible:
+                        target_cell.destructible = False
+                        target_cell.walkable = True
+                        target_cell.image = self.app.image_loader.get_image("dirt")
+                        self.create_explosion(Direction.WEST, Vector2(target_x, self._grid_pos.y), end=True)
+                        expand_west = False
+                    elif target_bomb is not None:
+                        target_bomb.on_explode(Direction.EAST)
+                        expand_west = False
+                    elif target_cell.walkable:
+                        self.create_explosion(Direction.WEST, Vector2(target_x, self._grid_pos.y), end=(target_x == 0 or final_iteration))
+                    else:
+                        expand_west = False
+
+            if expand_east:
+                target_x = self._grid_pos.x + val
+                if target_x < self._grid_size.x:
+                    target_cell: GridCell = self._grid.cells[target_x][self._grid_pos.y]
+                    target_bomb: Bomb = self._grid.bombs[target_x][self._grid_pos.y]
+                    if target_cell.destructible:
+                        target_cell.destructible = False
+                        target_cell.walkable = True
+                        target_cell.image = self.app.image_loader.get_image("dirt")
+                        self.create_explosion(Direction.EAST, Vector2(target_x, self._grid_pos.y), end=True)
+                        expand_east = False
+                    elif target_bomb is not None:
+                        target_bomb.on_explode(Direction.WEST)
+                        expand_east = False
+                    elif target_cell.walkable:
+                        self.create_explosion(Direction.EAST, Vector2(target_x, self._grid_pos.y), end=(target_x == self._grid_size.x-1 or final_iteration))
+                    else:
+                        expand_east = False
+
+            if expand_north:
+                target_y = self._grid_pos.y - val
+                if target_y >= 0:
+                    target_cell: GridCell = self._grid.cells[self._grid_pos.x][target_y]
+                    target_bomb: Bomb = self._grid.bombs[self._grid_pos.x][target_y]
+                    if target_cell.destructible:
+                        target_cell.destructible = False
+                        target_cell.walkable = True
+                        target_cell.image = self.app.image_loader.get_image("dirt")
+                        self.create_explosion(Direction.NORTH, Vector2(self._grid_pos.x, target_y), end=True)
+                        expand_north = False
+                    elif target_bomb is not None:
+                        target_bomb.on_explode(Direction.SOUTH)
+                        expand_north = False
+                    elif target_cell.walkable:
+                        self.create_explosion(Direction.NORTH, Vector2(self._grid_pos.x, target_y), end=(target_y == 0 or final_iteration))
+                    else:
+                        expand_north = False
+
+            if expand_south:
+                target_y = self._grid_pos.y + val
+                if target_y < self._grid_size.y:
+                    target_cell: GridCell = self._grid.cells[self._grid_pos.x][target_y]
+                    target_bomb: Bomb = self._grid.bombs[self._grid_pos.x][target_y]
+                    if target_cell.destructible:
+                        target_cell.destructible = False
+                        target_cell.walkable = True
+                        target_cell.image = self.app.image_loader.get_image("dirt")
+                        self.create_explosion(Direction.SOUTH, Vector2(self._grid_pos.x, target_y), end=True)
+                        expand_south = False
+                    elif target_bomb is not None:
+                        target_bomb.on_explode(Direction.NORTH)
+                        expand_south = False
+                    elif target_cell.walkable:
+                        self.create_explosion(Direction.SOUTH, Vector2(self._grid_pos.x, target_y), end=(target_y == self._grid_size.y - 1 or final_iteration))
+                    else:
+                        expand_south = False
+
+            if not expand_east and not expand_west and not expand_south and not expand_north:
+                break
+        
+        
+        
 
     def update(self):
         if self.app.clock.now() >= self.__fuse_time:
@@ -165,8 +348,14 @@ class GridAgent(GridEntity):
         self._movement_disabled: bool = False
         self._target_position: Vector2 = Vector2(0,0)
         self._mov_delta: Vector2 = Vector2(0,0)
-        self._fire_power = 1
-        self._bomb_count = 1
+        self._fire_power = 5
+        self._max_bombs = 3
+        self._bomb_count = 0
+
+        self.event_system.listen("bomb_exploded", self.return_bomb, sender=self)
+
+    def return_bomb(self):
+        self._bomb_count -= 1
 
     def set_grid(self, grid: GameGrid, initial_pos: Vector2):
         super().set_grid(grid, initial_pos)
@@ -192,15 +381,17 @@ class GridAgent(GridEntity):
         
         self._grid_pos = target_grid_pos
         self._target_position = self.compute_world_position(self._grid_pos)
-        self._mov_delta = (self._target_position - self.transform.position)/30
+        self._mov_delta = (self._target_position - self.transform.position)/10
         self._movement_disabled = True
 
     def place_bomb(self):
-        bomb_entity = self.world.add_entity()
-        bomb_entity.add_component(core.core_components.SpriteRenderer).sprite = self.app.image_loader.get_image("bomb")
-        bomb_cp: Bomb = bomb_entity.add_component(Bomb)
-        bomb_cp.set_grid(self._grid, self._grid_pos)
-        bomb_cp.set_owner(self)
+        if self._grid.bombs[self._grid_pos.x][self._grid_pos.y] is None and self._bomb_count < self._max_bombs:
+            self._bomb_count += 1
+            bomb_entity = self.world.add_entity()
+            bomb_entity.add_component(core.core_components.SpriteRenderer).sprite = self.app.image_loader.get_image("bomb")
+            bomb_cp: Bomb = bomb_entity.add_component(Bomb)
+            bomb_cp.set_grid(self._grid, self._grid_pos)
+            bomb_cp.set_owner(self)
 
 
     def update(self):
@@ -210,6 +401,9 @@ class GridAgent(GridEntity):
             self._movement_disabled = False
             self._mov_delta = Vector2(0,0)
 
+    @property
+    def firepower(self) -> int:
+        return self._fire_power
 
 class AIAgent(GridAgent):
     pass

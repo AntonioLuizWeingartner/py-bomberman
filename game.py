@@ -9,6 +9,7 @@ app = core.create_app((1200, 800), 60)
 
 app.image_loader.load_image("assets/images/wall.png", "wall")
 app.image_loader.load_image("assets/images/dirt.jpg", "dirt")
+app.image_loader.load_image("assets/images/obsidian.png", "ob")
 app.image_loader.load_image("assets/images/bomb.png", "bomb")
 
 app.image_loader.create_sprite_sheet("assets/images/explosions.png", "explosions", 4, 7)
