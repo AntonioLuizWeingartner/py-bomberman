@@ -1,3 +1,4 @@
+from core.math import Vector2
 import time
 import pygame
 import pygame.display
@@ -56,20 +57,57 @@ class TimingData:
     def target_fps(self) -> float:
         return self.__fps
 
+class SpriteSheet:
+
+    def __init__(self, source: pygame.Surface, row_count: int, column_count: int):
+        self.__source = source
+        self.__sprite_size = Vector2(source.get_width()/column_count, source.get_height()/row_count)
+        self.__sprite_matrix: List[List[pygame.Surface]] = list()
+        self.__row_count = row_count
+        self.__column_count = column_count
+        self.__generate_sprite_matrix()
+
+    def __generate_sprite_matrix(self):
+        for x in range(self.__column_count):
+            sprite_column: List[pygame.Surface] = list()
+            for y in range(self.__row_count):
+                sprite: pygame.Surface = pygame.Surface(self.__sprite_size.tuple, pygame.SRCALPHA)
+                rect = pygame.Rect(x*self.__sprite_size.x, y*self.__sprite_size.y, self.__sprite_size.x, self.__sprite_size.y)
+                sprite.blit(self.__source, (0,0), area=rect)
+                sprite.convert_alpha()
+                sprite_column.append(sprite)
+
+            self.__sprite_matrix.append(sprite_column)
+    
+    def __getitem__(self, key: int) -> List[pygame.Surface]:
+        return self.__sprite_matrix[key]
+
+
 class ImageLoader:
 
     def __init__(self):
         self.__loaded_images: Dict[str, pygame.Surface] = dict()
+        self.__loaded_sprite_sheets: Dict[str, SpriteSheet] = dict()
 
     def load_image(self, path: str, alias: str):
         img = pygame.image.load(path)
         img.convert_alpha()
         self.__loaded_images[alias] = img 
     
+    def create_sprite_sheet(self, path: str, alias: str, row_count: int, column_count: int):
+        img = pygame.image.load(path)
+        img.convert_alpha()
+        spr_sheet = SpriteSheet(img, row_count, column_count)
+        self.__loaded_sprite_sheets[alias] = spr_sheet
+
     def get_image(self, alias: str) -> pygame.Surface:
         return self.__loaded_images[alias]
 
+    def add_surface(self, surface: pygame.Surface, alias: str):
+        self.__loaded_images[alias] = surface
 
+    def get_sheet(self, alias: str) -> SpriteSheet:
+        return self.__loaded_sprite_sheets[alias]
 
 class Keyboard:
 

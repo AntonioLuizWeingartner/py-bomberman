@@ -197,7 +197,7 @@ class GridAgent(GridEntity):
 
     def place_bomb(self):
         bomb_entity = self.world.add_entity()
-        bomb_entity.add_component(core.core_components.SpriteRenderer)
+        bomb_entity.add_component(core.core_components.SpriteRenderer).sprite = self.app.image_loader.get_image("bomb")
         bomb_cp: Bomb = bomb_entity.add_component(Bomb)
         bomb_cp.set_grid(self._grid, self._grid_pos)
         bomb_cp.set_owner(self)
