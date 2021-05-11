@@ -4,6 +4,7 @@ import pygame
 import pygame.display
 import pygame.event
 import pygame.image
+import pygame.mixer
 import core.event_system
 import core.entity_system
 from typing import Callable, Dict, List
@@ -109,6 +110,17 @@ class ImageLoader:
     def get_sheet(self, alias: str) -> SpriteSheet:
         return self.__loaded_sprite_sheets[alias]
 
+class SoundLoader:
+
+    def __init__(self):
+        self.__loaded_sounds: Dict[str, pygame.mixer.Sound] = dict()
+
+    def load_sound(self, path: str, alias: str):
+        self.__loaded_sounds[alias] = pygame.mixer.Sound(path)
+
+    def play_sound(self, alias: str):
+        self.__loaded_sounds[alias].play()
+
 class Keyboard:
 
     KEY_PRESSED = "press"
@@ -155,7 +167,8 @@ class Application:
                 app_timing_data: TimingData,
                 img_loader: ImageLoader,
                 keyboard: Keyboard,
-                mouse: Mouse):
+                mouse: Mouse,
+                sound_loader: SoundLoader):
         
         self.__display: pygame.Surface = display
         self.__clock: Clock = clock
@@ -167,6 +180,7 @@ class Application:
 
         self.__timing_data = app_timing_data
         self.__image_loader = img_loader
+        self.__sound_loader = sound_loader
 
         self.load_standard_assets()
 
@@ -238,3 +252,7 @@ class Application:
     @property
     def clock(self) -> Clock:
         return self.__clock
+    
+    @property
+    def sound_loader(self) -> SoundLoader:
+        return self.__sound_loader

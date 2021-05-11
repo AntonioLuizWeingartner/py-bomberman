@@ -15,6 +15,10 @@ app.image_loader.load_image("assets/images/bomb.png", "bomb")
 app.image_loader.create_sprite_sheet("assets/images/explosions.png", "explosions", 4, 7)
 app.image_loader.create_sprite_sheet("assets/images/player.gif", "player", 4, 7)
 
+app.sound_loader.load_sound("assets/sfx/explosion_0.wav", "explosion")
+app.sound_loader.load_sound("assets/sfx/player_death.wav", "player_death")
+
+
 
 tabuleiro = app.world.add_entity()
 tabuleiro.add_component(core.core_components.SpriteRenderer)

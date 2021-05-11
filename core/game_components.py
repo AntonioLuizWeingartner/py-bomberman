@@ -272,6 +272,10 @@ class Bomb(GridEntity):
         expand_north: bool = True if incoming_direction != Direction.NORTH else False
         expand_south: bool = True if incoming_direction != Direction.SOUTH else False
 
+        if incoming_direction is None:
+            self.app.sound_loader.play_sound("explosion")
+
+      
         self.create_explosion(Direction.CENTER, self._grid_pos)
 
         for val in range(1,firepower+1):
@@ -467,6 +471,7 @@ class GridAgent(GridEntity):
         
         if(self._grid.explosions[self._grid_pos.x][self._grid_pos.y]):
             self.world.mark_entity_for_deletion(self.owner)
+            self.on_death()
 
     @property
     def firepower(self) -> int:
@@ -484,6 +489,9 @@ class Player(GridAgent):
         self.keyboard.register_callback(pygame.K_LEFT, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(-1, 0)))
         self.keyboard.register_callback(pygame.K_RIGHT, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(1, 0)))
         self.keyboard.register_callback(pygame.K_SPACE, Keyboard.KEY_PRESSED, functools.partial(self.place_bomb))
+
+    def on_death(self):
+        self.app.sound_loader.play_sound("player_death")
 
 class GameManager(core.entity_system.ScriptableComponent):
 
