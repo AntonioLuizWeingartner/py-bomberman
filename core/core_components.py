@@ -2,6 +2,7 @@ import pygame
 import core.entity_system
 import core.math
 
+#TODO ADD SOUND COMPONENT
 class SpriteRenderer(core.entity_system.DrawableComponent):
 
     def on_init(self):

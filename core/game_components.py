@@ -60,10 +60,12 @@ class GameGrid(core.entity_system.ScriptableComponent):
         self.__grid_cells: List[List[GridCell]] = list()
         self.__grid_image: pygame.Surface = pygame.Surface((grid_size.x*cell_size.x, grid_size.y * cell_size.y))
         self.__grid_bombs: List[List[Optional[Bomb]]] = list()
+        self.__grid_explosions: List[List[bool]] = list()
 
         for x in range(self.__grid_size.x):
             column: List[GridCell] = list()
             bomb_column: List[Optional[Bomb]] = list()
+            explosion_column: List[bool] = list()
             for y in range(self.__grid_size.y):
                 if (x+1) % 2 == 0 and (y+1) % 2 == 0:
                     cell = GridCell(self.app.image_loader.get_image("ob"), Vector2(x,y), self.event_system, False, False)
@@ -73,13 +75,20 @@ class GameGrid(core.entity_system.ScriptableComponent):
                 self.event_system.listen("cell_img_changed", self.update_grid_img, sender=cell)
                 column.append(cell)
                 bomb_column.append(None)
+                explosion_column.append(False)
 
             self.__grid_cells.append(column)
             self.__grid_bombs.append(bomb_column)
+            self.__grid_explosions.append(explosion_column)
         self.__grid_cells[0][0].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[0][1].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[1][0].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[0][0].walkable = True
+        self.__grid_cells[0][1].walkable = True
+        self.__grid_cells[1][0].walkable = True
         self.generate_grid_image()
         self.centralize_grid_in_screen()
-        self.__grid_cells[0][0].image = self.app.image_loader.get_image("dirt")
+
 
     def generate_grid_image(self):
         for x in range(self.__grid_size.x):
@@ -116,6 +125,11 @@ class GameGrid(core.entity_system.ScriptableComponent):
     @property
     def bombs(self) -> List[List[Optional[Bomb]]]:
         return self.__grid_bombs
+
+    @property
+    def explosions(self) -> List[List[bool]]:
+        return self.__grid_explosions
+
 
 class GridEntity(core.entity_system.ScriptableComponent):
     pass
@@ -179,24 +193,27 @@ class Explosion(core.entity_system.ScriptableComponent):
     def on_init(self):
         self.__remove_time_point = time.perf_counter() + 3
         self.__last_frame = 0
-        self.__frame_duration = 0.08
+        self.__frame_duration = 0.12
         self.__counter = BounceCounter(3,0)
         self.__max_frame_count = 8
         self.__frame_count = 0
-    def set_data(self, spr: core.core_components.SpriteRenderer, sprites: List[pygame.Surface]):
+
+    def set_data(self, spr: core.core_components.SpriteRenderer, sprites: List[pygame.Surface], grid: GameGrid, pos: Vector2):
         self.__sprites = sprites
         self.__spr = spr
+        self.__grid = grid
+        self.__pos = pos
 
     def update(self):
         if (time.perf_counter() - self.__last_frame) >= self.__frame_duration:
             self.__last_frame = time.perf_counter()
             self.__spr.sprite = self.__sprites[self.__counter.update()]
             self.__frame_count += 1
-            
+
         if self.__frame_count > self.__max_frame_count:
             self.world.mark_entity_for_deletion(self.owner)
+            self.__grid.explosions[self.__pos.x][self.__pos.y] = False
             
-
 class Bomb(GridEntity):
 
     def on_init(self):
@@ -213,7 +230,11 @@ class Bomb(GridEntity):
         self.__owner = agent
 
     def create_explosion(self, direction: Direction, pos: Vector2, end: bool = False):
+        #TODO MAKE EXPLOSIONS INTERACT WITH THE GRID
         sprites: pygame.Surface = None
+
+        self._grid.explosions[pos.x][pos.y] = True
+        
 
         if end:
             if direction == direction.NORTH:
@@ -236,7 +257,7 @@ class Bomb(GridEntity):
         spr = exp_entity.add_component(core.core_components.SpriteRenderer)
         exp_entity.transform.position = self.compute_world_position(pos)
         exp_cp = exp_entity.add_component(Explosion)
-        exp_cp.set_data(spr, sprites)
+        exp_cp.set_data(spr, sprites, self._grid, pos)
 
     def on_explode(self, incoming_direction: Optional[Direction] = None):
         self.event_system.broadcast("bomb_exploded", sender=self.__owner)
@@ -333,15 +354,15 @@ class Bomb(GridEntity):
 
             if not expand_east and not expand_west and not expand_south and not expand_north:
                 break
-        
-        
-        
-
+                
     def update(self):
         if self.app.clock.now() >= self.__fuse_time:
             self.on_explode()
 
 class GridAgent(GridEntity):
+
+    #TODO MAKE GRIDAGENTS DIE WHEN IN CONTACT WITH EXPLOSIONS
+    #TODO ADD CHARACTER ANIMATIONS TO GRID AGENTS
 
     def on_init(self):
         self._sprite_renderer: core.core_components.SpriteRenderer = self.owner.get_component(core.core_components.SpriteRenderer)
@@ -351,7 +372,14 @@ class GridAgent(GridEntity):
         self._fire_power = 5
         self._max_bombs = 3
         self._bomb_count = 0
-
+        self._mov_delta_factor = 10
+        self._movement_duration = (1/60)*self._mov_delta_factor
+        self._frame_duration = self._movement_duration/7
+        self._play_anim = False
+        self._current_anim_frame: int = 0
+        self._last_frame_tp: float = 0
+        self._direction: Direction = Direction.SOUTH
+        self._anim_type: int = 0
         self.event_system.listen("bomb_exploded", self.return_bomb, sender=self)
 
     def return_bomb(self):
@@ -359,9 +387,7 @@ class GridAgent(GridEntity):
 
     def set_grid(self, grid: GameGrid, initial_pos: Vector2):
         super().set_grid(grid, initial_pos)
-        self._agent_img: pygame.Surface = pygame.Surface(self._cell_size.tuple)
-        self._agent_img.fill((255,255,255))
-        self._sprite_renderer.sprite = self._agent_img
+        self._sprite_renderer.sprite = self.app.image_loader.get_sheet("player")[0][2]
 
     def place_entity(self):
         world_pos = self.compute_world_position(self._grid_pos)
@@ -379,9 +405,23 @@ class GridAgent(GridEntity):
         if self._grid.cells[target_grid_pos.x][target_grid_pos.y].walkable is False:
             return
         
+        if direction.y == 1:
+            self._direction = Direction.SOUTH
+            self._anim_type = 2
+        elif direction.y == -1:
+            self._direction = Direction.NORTH
+            self._anim_type = 0
+        elif direction.x == 1:
+            self._direction = Direction.EAST
+            self._anim_type = 1
+        elif direction.x == -1:
+            self._direction = Direction.WEST
+            self._anim_type = 3
+
+        self._play_anim = True
         self._grid_pos = target_grid_pos
         self._target_position = self.compute_world_position(self._grid_pos)
-        self._mov_delta = (self._target_position - self.transform.position)/10
+        self._mov_delta = (self._target_position - self.transform.position)/self._mov_delta_factor
         self._movement_disabled = True
 
     def place_bomb(self):
@@ -393,13 +433,40 @@ class GridAgent(GridEntity):
             bomb_cp.set_grid(self._grid, self._grid_pos)
             bomb_cp.set_owner(self)
 
+    def __set_end_sprite(self):
+        spr: pygame.Surface = None
+        if self._direction == Direction.NORTH:
+            spr = self.app.image_loader.get_sheet("player")[0][0]
+        elif self._direction == Direction.SOUTH:
+            spr = self.app.image_loader.get_sheet("player")[0][2]
+        elif self._direction == Direction.EAST:
+            spr = self.app.image_loader.get_sheet("player")[0][1]
+        elif self._direction == Direction.WEST:
+            spr = self.app.image_loader.get_sheet("player")[0][3]
+        self._sprite_renderer.sprite = spr
+
+    def on_death(self):
+        pass
+
 
     def update(self):
         self.transform.position += self._mov_delta
+        if(self._play_anim):
+            if(time.perf_counter() - self._last_frame_tp >= self._frame_duration):
+                self._last_frame_tp = time.perf_counter()
+                self._sprite_renderer.sprite = self.app.image_loader.get_sheet("player")[self._current_anim_frame][self._anim_type]
+                self._current_anim_frame += 1
+
         if (self.transform.position - self._target_position).squared_mag <= 0.15:
+            self._play_anim = False
+            self._current_anim_frame = 0
             self.transform.position = self._target_position
             self._movement_disabled = False
             self._mov_delta = Vector2(0,0)
+            self.__set_end_sprite()
+        
+        if(self._grid.explosions[self._grid_pos.x][self._grid_pos.y]):
+            self.world.mark_entity_for_deletion(self.owner)
 
     @property
     def firepower(self) -> int:
