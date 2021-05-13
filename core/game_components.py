@@ -1,6 +1,8 @@
 from __future__ import annotations
 import enum
 from os import closerange, system
+from sys import path
+import sys
 import time
 from types import MethodType
 from pygame import sprite
@@ -72,7 +74,7 @@ class GameGrid(core.entity_system.ScriptableComponent):
                 if (x+1) % 2 == 0 and (y+1) % 2 == 0:
                     cell = GridCell(self.app.image_loader.get_image("ob"), Vector2(x,y), self.event_system, False, False)
                 else:
-                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, True, True)   
+                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, False, True)   
 
                 self.event_system.listen("cell_img_changed", self.update_grid_img, sender=cell)
                 column.append(cell)
@@ -96,10 +98,8 @@ class GameGrid(core.entity_system.ScriptableComponent):
         self.__grid_cells[self.__grid_size.x-2][self.__grid_size.y-1].walkable = True
         self.__grid_cells[self.__grid_size.x-1][self.__grid_size.y-2].walkable = True
 
-
         self.generate_grid_image()
         self.centralize_grid_in_screen()
-
 
     def generate_grid_image(self):
         for x in range(self.__grid_size.x):
@@ -369,7 +369,15 @@ class Bomb(GridEntity):
 
             if not expand_east and not expand_west and not expand_south and not expand_north:
                 break
-                
+
+    @property
+    def firepower(self) -> int:
+        return self.__owner.firepower      
+    
+    @property
+    def position(self) -> Vector2:
+        return self._grid_pos
+
     def update(self):
         if self.app.clock.now() >= self.__fuse_time:
             self.on_explode()
@@ -411,14 +419,14 @@ class GridAgent(GridEntity):
 
     def move(self, direction: Vector2):
         if self._movement_disabled:
-            return
+            return None
         target_grid_pos = self._grid_pos + direction
 
         if target_grid_pos.x > self._grid_size.x - 1 or target_grid_pos.x < 0 or target_grid_pos.y > self._grid_size.y - 1 or target_grid_pos.y < 0:
-            return
+            return False
         
         if self._grid.cells[target_grid_pos.x][target_grid_pos.y].walkable is False:
-            return
+            return False
         
         if direction.y == 1:
             self._direction = Direction.SOUTH
@@ -438,6 +446,7 @@ class GridAgent(GridEntity):
         self._target_position = self.compute_world_position(self._grid_pos)
         self._mov_delta = (self._target_position - self.transform.position)/self._mov_delta_factor
         self._movement_disabled = True
+        return True
 
     def place_bomb(self):
         if self._grid.bombs[self._grid_pos.x][self._grid_pos.y] is None and self._bomb_count < self._max_bombs:
@@ -503,13 +512,25 @@ class AIAgent(GridAgent):
         def f_cost(self) -> int:
             return self.g_cost + self.h_cost
 
+    class AIStates:
+        SEEKCOVER = 0
+        ATTACK = 1
+        DESTROY = 2
+        IDLE = 3
+
     def on_init(self):
         super().on_init()
+        self.__state: AIAgent.AIStates = AIAgent.AIStates.IDLE
+        self.__wait_frames: int = 0
+        self.__crr_wait: int = 0
+        self.__seek_cover_frames: int = 0
+        self.__crr_seek_cover: int = 0
+        self._max_bombs = 1
 
     def set_player(self, player: Player):
         self.__player = player
 
-    def find_path(self, end_pos: Vector2):
+    def find_path(self, end_pos: Vector2, ignore_walkability: bool = False):
         open_nodes: Dict[Vector2, AIAgent.ASNode] = dict()
         closed_nodes: Dict[Vector2, AIAgent.ASNode] = dict()
         open_nodes[self._grid_pos] = AIAgent.ASNode(self._grid_pos, None, 0, 0)
@@ -530,19 +551,20 @@ class AIAgent(GridAgent):
             successsors: List[AIAgent.ASNode] = list()
 
             temp_pos = q.position + Vector2(0,1)
-            if temp_pos.y < self._grid_size.y and self._grid.cells[temp_pos.x][temp_pos.y].walkable:
+
+            if temp_pos.y < self._grid_size.y and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and self._grid.explosions[temp_pos.x][temp_pos.y] is False:
                 successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
 
             temp_pos = q.position + Vector2(0,-1)
-            if temp_pos.y >= 0 and self._grid.cells[temp_pos.x][temp_pos.y].walkable:
+            if temp_pos.y >= 0 and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and self._grid.explosions[temp_pos.x][temp_pos.y] is False:
                 successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
 
             temp_pos = q.position + Vector2(1,0)
-            if temp_pos.x < self._grid_size.x and self._grid.cells[temp_pos.x][temp_pos.y].walkable:
+            if temp_pos.x < self._grid_size.x and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and self._grid.explosions[temp_pos.x][temp_pos.y] is False:
                 successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
             
             temp_pos = q.position + Vector2(-1,0)
-            if temp_pos.x >= 0 and self._grid.cells[temp_pos.x][temp_pos.y].walkable:
+            if temp_pos.x >= 0 and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and self._grid.explosions[temp_pos.x][temp_pos.y] is False:
                 successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
 
             for succ in successsors:
@@ -560,19 +582,176 @@ class AIAgent(GridAgent):
             
             closed_nodes[q.position] = q
 
-    def __AI_update(self):
-        t0 = time.perf_counter()
-        node = self.find_path(self.__player._grid_pos)
-        if node is not None:
-            node_list = list()
-            n = node
-            while n.parent is not None:
-                node_list.insert(0, n)
-                n = n.parent
-            print(node.position - self._grid_pos)
-            self.move(node_list[0].position - self._grid_pos)
+    def __build_path(self, node: AIAgent.ASNode) -> List[AIAgent.ASNode]:
+        if node is None:
+            return None
+
+        path = list()
+        n = node
+        while n.parent is not None:
+            path.insert(0, n)
+            n = n.parent
+        if path:
+            return path
         else:
-            print("FOUND NOTHING")
+            path.append(n)
+            return path
+
+
+
+    def __expand_bombs(self) -> List[List[bool]]:
+        #TODO RETURN A GRID WITH EVERY BOMB EXPLODED
+        danger_grid: List[List[bool]] = list()
+        bombs: List[Bomb] = list()
+        for x in range(self._grid_size.x):
+            danger_grid_column: List[bool] = list()
+            for y in range(self._grid_size.y):
+                if self._grid.bombs[x][y] is not None:
+                    bombs.append(self._grid.bombs[x][y])
+                    danger_grid_column.append(True)
+                else:
+                    danger_grid_column.append(False)
+            danger_grid.append(danger_grid_column)
+
+        for bomb in bombs:
+            expand_west: bool = True
+            expand_east: bool = True
+            expand_north: bool = True
+            expand_south: bool = True
+            for i in range(1, bomb.firepower):
+                
+                if not(expand_west or expand_west or expand_north or expand_south):
+                    break
+
+                if expand_west:
+                    target_x = bomb.position.x - i
+                    if target_x < 0:
+                        expand_west = False
+                    else:
+                        danger_grid[target_x][bomb.position.y] = True
+                
+                if expand_east:
+                    target_x = bomb.position.x + i
+                    if target_x >= self._grid_size.x:
+                        expand_east = False
+                    else:
+                        danger_grid[target_x][bomb.position.y] = True
+
+                if expand_north:
+                    target_y = bomb.position.y - i
+                    if target_y < 0:
+                        expand_north = False
+                    else:
+                        danger_grid[bomb.position.x][target_y] = True
+                
+                if expand_south:
+                    target_y = bomb.position.y + i
+                    if target_y >= self._grid_size.y:
+                        expand_south = False
+                    else:
+                        danger_grid[bomb.position.x][target_y] = True
+
+        return danger_grid
+
+    def __find_path_to_safety(self) -> AIAgent.ASNode:
+        open_nodes: List[AIAgent.ASNode] = list()
+        closed_nodes: Dict[Vector2, AIAgent.ASNode] = dict()
+        open_nodes.append(AIAgent.ASNode(self._grid_pos, None, 0, 0))
+        danger_grid = self.__expand_bombs()
+
+        if danger_grid[self._grid_pos.x][self._grid_pos.y] is False:
+            return open_nodes[0]
+        while open_nodes:
+            q = open_nodes.pop(0)
+            closed_nodes[q.position] = q
+            successors: List[AIAgent.ASNode] = list()
+            
+            temp_pos = q.position + Vector2(0, 1)
+            if temp_pos.y < self._grid_size.y and self._grid.cells[temp_pos.x][temp_pos.y].walkable and temp_pos not in closed_nodes:
+                successors.append(AIAgent.ASNode(temp_pos, q, 0, 0))
+
+            temp_pos = q.position + Vector2(0, -1)
+            if temp_pos.y >= 0 and self._grid.cells[temp_pos.x][temp_pos.y].walkable and temp_pos not in closed_nodes:
+                successors.append(AIAgent.ASNode(temp_pos, q, 0, 0))
+            
+            temp_pos = q.position + Vector2(1, 0)
+            if temp_pos.x < self._grid_size.y and self._grid.cells[temp_pos.x][temp_pos.y].walkable and temp_pos not in closed_nodes:
+                successors.append(AIAgent.ASNode(temp_pos, q, 0, 0))
+
+            temp_pos = q.position + Vector2(-1, 0)
+            if temp_pos.x >= 0 and self._grid.cells[temp_pos.x][temp_pos.y].walkable and temp_pos not in closed_nodes:
+                successors.append(AIAgent.ASNode(temp_pos, q, 0, 0))
+
+            open_nodes.extend(successors)
+
+            for succ in successors:
+                if danger_grid[succ.position.x][succ.position.y] is False:
+                    return succ
+
+    def __AI_update(self):
+        if self.__state == AIAgent.AIStates.IDLE:
+            if self.__crr_wait < self.__wait_frames:
+                self.__crr_wait += 1
+            else:
+                self.__crr_wait = 0
+                path_to_player = self.find_path(self.__player._grid_pos)
+                if path_to_player is not None:
+                    self.__state = AIAgent.AIStates.ATTACK
+                else:
+                    self.__state = AIAgent.AIStates.DESTROY
+
+        elif self.__state == AIAgent.AIStates.SEEKCOVER:
+            #TODO path find to safety, use flood fill maybe
+            #TODO go towards that path until your bomb explodes
+            if self._bomb_count == 0 and self.__crr_seek_cover >= self.__seek_cover_frames:
+                self.__crr_seek_cover = 0
+                print("SEEK COVER COMPLETED, GOING IDLE FOR 30 FRAMES")
+                self.__wait(30)
+            else:
+                self.__crr_seek_cover += 1
+                path_to_safety = self.__build_path(self.__find_path_to_safety())
+                if path_to_safety is not None:
+                    move_dir = path_to_safety[0].position - self._grid_pos
+                    self.move(move_dir)
+
+                else:
+                    print("WILL DIE")
+
+            pass
+        elif self.__state == AIAgent.AIStates.DESTROY:
+            #TODO path find to player, ignoring walkability
+            path_to_player = self.find_path(self.__player._grid_pos, True)
+            true_path_to_player = self.find_path(self.__player._grid_pos)
+            if true_path_to_player is not None:
+                self.__wait(30)
+
+            if path_to_player is not None:
+                #TODO move towards path
+                path = self.__build_path(path_to_player)
+                move_dir = path[0].position - self._grid_pos
+
+                if self.move(move_dir) is False:
+                    #TODO If a destructible block is in the next position, place a bomb and then change state to seek cover
+                    self.place_bomb()
+                    self.__seekcover(250)
+            else:
+                pass
+
+        elif self.__state == AIAgent.AIStates.ATTACK:
+            #TODO pathfind to player, considering walkability
+            #TODO move towards path until you can place a bomb to kill him
+            #TODO if you can kill him, place down a bomb and seek covers
+            #TODO If path suddenly gets blocked, change behaviour to seek cover
+            print("ATTACKING")
+            pass
+
+    def __seekcover(self, frames: int):
+        self.__state = AIAgent.AIStates.SEEKCOVER
+        self.__seek_cover_frames = frames
+
+    def __wait(self, frames: int):
+        self.__state = AIAgent.AIStates.IDLE
+        self.__wait_frames = frames
     
     def update(self):
         super().update()

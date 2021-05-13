@@ -10,8 +10,8 @@ def create_app(window_size: Tuple[int, int], frame_rate = 60) -> core.app.Applic
     Esse método cria um objeto do tipo aplicação. Deve ser chamado apenas uma vez, do contrário um erro sera gerado.
     """
     
-    pygame.mixer.pre_init(44100, -16, 1, 256)
-    pygame.mixer.init()
+    pygame.mixer.pre_init(44100, -16, 2, 512)
+    pygame.mixer.init(channels=32)
     pygame.init()
 
     display = pygame.display.set_mode(window_size)

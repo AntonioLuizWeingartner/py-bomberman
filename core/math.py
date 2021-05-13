@@ -38,6 +38,17 @@ class Vector2:
     def __truediv__(self, other: float):
         return Vector2(self.x/other, self.y/other)
 
+    def __hash__(self):
+        return hash(self.tuple)
+
+    def __eq__(self, other: Vector2) -> bool:
+        if self.x == other.x and self.y == other.y:
+            return True
+        return False
+
+    def mahattan_distance(self, other: Vector2) -> float:
+        return abs(self.x-other.x) + abs(self.y+other.y)
+
     @property
     def squared_mag(self):
         return self.x**2 + self.y**2
