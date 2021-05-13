@@ -1,6 +1,8 @@
 from __future__ import annotations
 import enum
+from os import closerange, system
 import time
+from types import MethodType
 from pygame import sprite
 from core.app import Keyboard
 import pygame
@@ -9,7 +11,7 @@ import core.event_system
 import core.core_components
 import core.app
 import functools
-from typing import List, Optional
+from typing import Dict, List, Optional, MutableSet
 from core.math import Vector2
 
 class GridCell:
@@ -70,7 +72,7 @@ class GameGrid(core.entity_system.ScriptableComponent):
                 if (x+1) % 2 == 0 and (y+1) % 2 == 0:
                     cell = GridCell(self.app.image_loader.get_image("ob"), Vector2(x,y), self.event_system, False, False)
                 else:
-                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, False, True)   
+                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, True, True)   
 
                 self.event_system.listen("cell_img_changed", self.update_grid_img, sender=cell)
                 column.append(cell)
@@ -86,6 +88,15 @@ class GameGrid(core.entity_system.ScriptableComponent):
         self.__grid_cells[0][0].walkable = True
         self.__grid_cells[0][1].walkable = True
         self.__grid_cells[1][0].walkable = True
+
+        self.__grid_cells[self.__grid_size.x-1][self.__grid_size.y-1].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[self.__grid_size.x-2][self.__grid_size.y-1].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[self.__grid_size.x-1][self.__grid_size.y-2].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[self.__grid_size.x-1][self.__grid_size.y-1].walkable = True
+        self.__grid_cells[self.__grid_size.x-2][self.__grid_size.y-1].walkable = True
+        self.__grid_cells[self.__grid_size.x-1][self.__grid_size.y-2].walkable = True
+
+
         self.generate_grid_image()
         self.centralize_grid_in_screen()
 
@@ -430,6 +441,7 @@ class GridAgent(GridEntity):
 
     def place_bomb(self):
         if self._grid.bombs[self._grid_pos.x][self._grid_pos.y] is None and self._bomb_count < self._max_bombs:
+            self.app.sound_loader.play_sound("bomb_place")
             self._bomb_count += 1
             bomb_entity = self.world.add_entity()
             bomb_entity.add_component(core.core_components.SpriteRenderer).sprite = self.app.image_loader.get_image("bomb")
@@ -468,7 +480,7 @@ class GridAgent(GridEntity):
             self._movement_disabled = False
             self._mov_delta = Vector2(0,0)
             self.__set_end_sprite()
-        
+
         if(self._grid.explosions[self._grid_pos.x][self._grid_pos.y]):
             self.world.mark_entity_for_deletion(self.owner)
             self.on_death()
@@ -478,7 +490,93 @@ class GridAgent(GridEntity):
         return self._fire_power
 
 class AIAgent(GridAgent):
-    pass
+
+    class ASNode:
+
+        def __init__(self, pos: Vector2, parent: AIAgent.ASNode, dist_f_start: int, dist_f_end: int):
+            self.position = pos
+            self.parent = parent
+            self.g_cost = dist_f_start
+            self.h_cost = dist_f_end
+
+        @property
+        def f_cost(self) -> int:
+            return self.g_cost + self.h_cost
+
+    def on_init(self):
+        super().on_init()
+
+    def set_player(self, player: Player):
+        self.__player = player
+
+    def find_path(self, end_pos: Vector2):
+        open_nodes: Dict[Vector2, AIAgent.ASNode] = dict()
+        closed_nodes: Dict[Vector2, AIAgent.ASNode] = dict()
+        open_nodes[self._grid_pos] = AIAgent.ASNode(self._grid_pos, None, 0, 0)
+
+        if end_pos == self._grid_pos:
+            return
+
+        def find_lowest_f_cost_node(nodes: Dict[Vector2, AIAgent.ASNode]) -> AIAgent.ASNode:
+            lowest_f_cost_node: AIAgent.ASNode = AIAgent.ASNode(Vector2(0,0), None, 5000,5000)
+            for node in nodes.values():
+                if node.f_cost < lowest_f_cost_node.f_cost:
+                    lowest_f_cost_node = node
+            return lowest_f_cost_node
+
+        while open_nodes:
+            q: AIAgent.ASNode = find_lowest_f_cost_node(open_nodes)
+            del open_nodes[q.position]
+            successsors: List[AIAgent.ASNode] = list()
+
+            temp_pos = q.position + Vector2(0,1)
+            if temp_pos.y < self._grid_size.y and self._grid.cells[temp_pos.x][temp_pos.y].walkable:
+                successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
+
+            temp_pos = q.position + Vector2(0,-1)
+            if temp_pos.y >= 0 and self._grid.cells[temp_pos.x][temp_pos.y].walkable:
+                successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
+
+            temp_pos = q.position + Vector2(1,0)
+            if temp_pos.x < self._grid_size.x and self._grid.cells[temp_pos.x][temp_pos.y].walkable:
+                successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
+            
+            temp_pos = q.position + Vector2(-1,0)
+            if temp_pos.x >= 0 and self._grid.cells[temp_pos.x][temp_pos.y].walkable:
+                successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
+
+            for succ in successsors:
+                if succ.position == end_pos:
+                    return succ
+
+                if succ.position in open_nodes:
+                    if open_nodes[succ.position].f_cost < succ.f_cost:
+                        continue
+                elif succ.position in closed_nodes:
+                    if closed_nodes[succ.position].f_cost < succ.f_cost:
+                        continue
+                else:
+                    open_nodes[succ.position] = succ
+            
+            closed_nodes[q.position] = q
+
+    def __AI_update(self):
+        t0 = time.perf_counter()
+        node = self.find_path(self.__player._grid_pos)
+        if node is not None:
+            node_list = list()
+            n = node
+            while n.parent is not None:
+                node_list.insert(0, n)
+                n = n.parent
+            print(node.position - self._grid_pos)
+            self.move(node_list[0].position - self._grid_pos)
+        else:
+            print("FOUND NOTHING")
+    
+    def update(self):
+        super().update()
+        self.__AI_update()
 
 class Player(GridAgent):
 

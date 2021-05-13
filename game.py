@@ -17,6 +17,7 @@ app.image_loader.create_sprite_sheet("assets/images/player.gif", "player", 4, 7)
 
 app.sound_loader.load_sound("assets/sfx/explosion_0.wav", "explosion")
 app.sound_loader.load_sound("assets/sfx/player_death.wav", "player_death")
+app.sound_loader.load_sound("assets/sfx/bomb_place.wav", "bomb_place")
 
 
 
@@ -29,5 +30,11 @@ agent = app.world.add_entity()
 agent.add_component(core.core_components.SpriteRenderer)
 agent: core.game_components.GridAgent = agent.add_component(core.game_components.Player)
 agent.set_grid(gg, Vector2(0,0))
+
+ai = app.world.add_entity()
+ai.add_component(core.core_components.SpriteRenderer)
+ai_controller: core.game_components.GridAgent = ai.add_component(core.game_components.AIAgent)
+ai_controller.set_grid(gg, Vector2(20,20))
+ai_controller.set_player(agent) 
 
 app.start()
