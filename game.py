@@ -24,17 +24,25 @@ app.sound_loader.load_sound("assets/sfx/bomb_place.wav", "bomb_place")
 tabuleiro = app.world.add_entity()
 tabuleiro.add_component(core.core_components.SpriteRenderer)
 gg: core.game_components.GameGrid = tabuleiro.add_component(core.game_components.GameGrid)
-gg.generate_grid(Vector2(25,25), Vector2(32,32))
+gg.generate_grid(Vector2(21,21), Vector2(32,32))
 
 agent = app.world.add_entity()
 agent.add_component(core.core_components.SpriteRenderer)
 agent: core.game_components.GridAgent = agent.add_component(core.game_components.Player)
 agent.set_grid(gg, Vector2(0,0))
 
+
 ai = app.world.add_entity()
 ai.add_component(core.core_components.SpriteRenderer)
 ai_controller: core.game_components.GridAgent = ai.add_component(core.game_components.AIAgent)
-ai_controller.set_grid(gg, Vector2(24,24))
+ai_controller.set_grid(gg, Vector2(20,20))
 ai_controller.set_player(agent) 
+
+ai2 = app.world.add_entity()
+ai2.add_component(core.core_components.SpriteRenderer)
+ai_controller: core.game_components.GridAgent = ai2.add_component(core.game_components.AIAgent)
+ai_controller.set_grid(gg, Vector2(20,0))
+ai_controller.set_player(agent)
+
 
 app.start()
