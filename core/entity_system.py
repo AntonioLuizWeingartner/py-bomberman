@@ -169,8 +169,6 @@ class World:
     def remove_entity(self, entity_instance: Entity):
         if entity_instance in self.__entities:
             self.__entities.remove(entity_instance)
-        else:
-            raise EntityNotFoundError()
     
     def update(self):
         for entity in self.__deletion_list:

@@ -74,7 +74,7 @@ class GameGrid(core.entity_system.ScriptableComponent):
                 if (x+1) % 2 == 0 and (y+1) % 2 == 0:
                     cell = GridCell(self.app.image_loader.get_image("ob"), Vector2(x,y), self.event_system, False, False)
                 else:
-                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, False, True)   
+                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, True, False)   
 
                 self.event_system.listen("cell_img_changed", self.update_grid_img, sender=cell)
                 column.append(cell)
@@ -115,6 +115,19 @@ class GameGrid(core.entity_system.ScriptableComponent):
         self.__grid_cells[self.__grid_size.x-1][0].destructible = False
         self.__grid_cells[self.__grid_size.x-2][0].destructible = False
         self.__grid_cells[self.__grid_size.x-1][1].destructible = False
+
+        self.__grid_cells[0][self.__grid_size.y-1].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[1][self.__grid_size.y-1].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[0][self.__grid_size.y-2].image = self.app.image_loader.get_image("dirt")
+        self.__grid_cells[0][self.__grid_size.y-1].walkable = True
+        self.__grid_cells[1][self.__grid_size.y-1].walkable = True
+        self.__grid_cells[0][self.__grid_size.y-2].walkable = True
+
+        self.__grid_cells[0][self.__grid_size.y-1].destructible = False
+        self.__grid_cells[1][self.__grid_size.y-1].destructible = False
+        self.__grid_cells[0][self.__grid_size.y-2].destructible = False
+
+
 
         self.generate_grid_image()
         self.centralize_grid_in_screen()
@@ -636,35 +649,37 @@ class AIAgent(GridAgent):
             expand_east: bool = True
             expand_north: bool = True
             expand_south: bool = True
-            for i in range(1, bomb.firepower):
+            #danger_grid[bomb._grid_pos.x][bomb._grid_pos.y] = True
+            for i in range(1, bomb.firepower+1):
                 
+                """
                 if not(expand_west or expand_west or expand_north or expand_south):
                     break
-
+                """
                 if expand_west:
                     target_x = bomb.position.x - i
-                    if target_x < 0:
+                    if target_x < 0 or self._grid.cells[target_x][bomb._grid_pos.y].walkable is False:
                         expand_west = False
                     else:
                         danger_grid[target_x][bomb.position.y] = True
                 
                 if expand_east:
                     target_x = bomb.position.x + i
-                    if target_x >= self._grid_size.x:
+                    if target_x >= self._grid_size.x or self._grid.cells[target_x][bomb._grid_pos.y].walkable is False:
                         expand_east = False
                     else:
-                        danger_grid[target_x][bomb.position.y] = True
+                        danger_grid[target_x][bomb._grid_pos.y] = True
 
                 if expand_north:
                     target_y = bomb.position.y - i
-                    if target_y < 0:
+                    if target_y < 0 or self._grid.cells[bomb._grid_pos.x][target_y].walkable is False:
                         expand_north = False
                     else:
                         danger_grid[bomb.position.x][target_y] = True
                 
                 if expand_south:
                     target_y = bomb.position.y + i
-                    if target_y >= self._grid_size.y:
+                    if target_y >= self._grid_size.y or self._grid.cells[bomb._grid_pos.x][target_y].walkable is False:
                         expand_south = False
                     else:
                         danger_grid[bomb.position.x][target_y] = True
@@ -735,7 +750,6 @@ class AIAgent(GridAgent):
                 if path_to_safety is not None:
                     move_dir = path_to_safety[0].position - self._grid_pos
                     self.move(move_dir)
-
                 else:
                     print("WILL DIE")
 
@@ -757,7 +771,8 @@ class AIAgent(GridAgent):
                     self.place_bomb()
                     self.__seekcover(250)
             else:
-                pass
+                self.place_bomb()
+                self.__seekcover(250)
 
         elif self.__state == AIAgent.AIStates.ATTACK:
             #TODO pathfind to player, considering walkability
@@ -766,11 +781,12 @@ class AIAgent(GridAgent):
             #TODO If path suddenly gets blocked, change behaviour to seek cover
             y_aligned: bool = True if self._grid_pos.y == self.__player._grid_pos.y else False
             x_aligned: bool = True if self._grid_pos.x == self.__player._grid_pos.x else False
+            bomb_placed: bool = False
 
             if y_aligned:
                 distance = self._grid_pos.x - self.__player._grid_pos.x
                 direction: int = -1 if distance > 0 else 1
-                if distance <= self.firepower:
+                if distance < self.firepower:
                     #TODO test if there is a clear path between player and bot
                     clear_path: bool = True
                     for i in range(distance):
@@ -779,12 +795,14 @@ class AIAgent(GridAgent):
                             break
 
                     if clear_path:
+                        bomb_placed = True
                         self.place_bomb()
                         self.__seekcover(250)
+
             elif x_aligned:
                 distance = self._grid_pos.y - self.__player._grid_pos.y
                 direction: int = -1 if distance > 0 else 1
-                if distance <= self.firepower:
+                if distance < self.firepower:
                     #TODO test if there is a clear path between player and bot
                     clear_path: bool = True
                     for i in range(distance):
@@ -793,18 +811,21 @@ class AIAgent(GridAgent):
                             break
 
                     if clear_path:
+                        bomb_placed = True
                         self.place_bomb()
                         self.__seekcover(250)
-            else:
+
+            if bomb_placed is False:
                 #TODO go towards player
                 path = self.__build_path(self.find_path(self.__player._grid_pos))
 
                 if path is not None:
                     move_dir = path[0].position - self._grid_pos
                     self.move(move_dir)
-
-            print("ATTACKING")
-            pass
+                else:
+                    self.place_bomb()
+                    self.__seekcover(1)    
+           
 
     def __seekcover(self, frames: int):
         self.__state = AIAgent.AIStates.SEEKCOVER
