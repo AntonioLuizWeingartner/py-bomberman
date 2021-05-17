@@ -208,6 +208,9 @@ class Application:
                 self.__event_system.broadcast(str(event.key) + Keyboard.KEY_PRESSED)
             elif event.type == pygame.KEYUP:
                 self.__event_system.broadcast(str(event.key) + Keyboard.KEY_RELEASE)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                self.__event_system.broadcast(str(event.button) + "mouse_down", None, event.pos)
+
 
     def update_game_world(self):
         if self.__paused is False:

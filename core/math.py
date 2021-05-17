@@ -49,6 +49,10 @@ class Vector2:
     def mahattan_distance(self, other: Vector2) -> float:
         return abs(self.x-other.x) + abs(self.y+other.y)
 
+    def to_int_vec(self):
+        self.x = int(self.x)
+        self.y = int(self.y)
+
     @property
     def squared_mag(self):
         return self.x**2 + self.y**2
