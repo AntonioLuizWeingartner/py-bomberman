@@ -945,16 +945,16 @@ class GameManager(core.entity_system.ScriptableComponent):
         self._game_grid_entity = self.world.add_entity()
         self._game_grid_entity.add_component(core.core_components.SpriteRenderer)
         self._game_grid: GameGrid = self._game_grid_entity.add_component(GameGrid)
-        self._game_grid.generate_grid(Vector2(5, 5), Vector2(32, 32))
+        self._game_grid.generate_grid(Vector2(17, 17), Vector2(32, 32))
 
         self._player_entity = self.world.add_entity()
         self._player_entity.add_component(core.core_components.SpriteRenderer)
         self._player_controller: Player = self._player_entity.add_component(Player)
         self._player_controller.set_grid(self._game_grid, Vector2(0, 0))
 
-        self.add_AI(Vector2(0,4))
-        self.add_AI(Vector2(4, 0))
-        self.add_AI(Vector2(4, 4))
+        self.add_AI(Vector2(0, 16))
+        self.add_AI(Vector2(16, 0))
+        self.add_AI(Vector2(16, 16))
 
     def load_highest_score(self):
         score_file = open("data/score.dat", "r")
