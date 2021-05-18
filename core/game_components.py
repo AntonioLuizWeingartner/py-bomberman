@@ -886,7 +886,7 @@ class GameManager(core.entity_system.ScriptableComponent):
 
         self._quit_button = core.core_components.Button(Vector2(600, 350), self._menu_canvas)
         self._quit_button.text = "SAIR"
-        self._quit_button.foreground_color = (0, 180, 180, 255)
+        self._quit_button.foreground_color = (0, 210, 210, 255)
 
         self._main_text = core.core_components.Button(Vector2(600, 50), self._menu_canvas)
         self._main_text.text = "py-BOMBERMAN"
@@ -899,15 +899,17 @@ class GameManager(core.entity_system.ScriptableComponent):
 
         self._game_over_canvas: core.core_components.Canvas = self.owner.add_component(core.core_components.Canvas)
         self._retry_button = core.core_components.Button(Vector2(600, 200), self._game_over_canvas)
-        self._retry_button.text = "TENTAR NOVAMENTE"
         self._retry_button.foreground_color = (0, 210, 210, 255)
+        self._retry_button.text = "TENTAR NOVAMENTE"
         self._retry_button.on_click = self.start_game
 
         self._main_menu_button = core.core_components.Button(Vector2(600, 350), self._game_over_canvas)
-        self._main_menu_button.text = "VOLTAR PARA O MENU PRINCIPAL"
         self._main_menu_button.foreground_color = (0, 210, 210, 255)
+        self._main_menu_button.text = "VOLTAR PARA O MENU PRINCIPAL"
+        
 
         self._main_menu_button.on_click = self._game_over_to_main_menu
+
 
 
         self._game_over_text = core.core_components.Button(Vector2(600, 50), self._game_over_canvas)
