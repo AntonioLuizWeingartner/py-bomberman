@@ -916,6 +916,16 @@ class GameManager(core.entity_system.ScriptableComponent):
         self._game_over_text.font_size = 30
         self._game_over_text.foreground_color = (0,0,0,0)
 
+        self._final_score_text = core.core_components.Button(Vector2(600, 450), self._game_over_canvas)
+        self._final_score_text.foreground_color = (0,0,0,0)
+        self._highest_score_text = core.core_components.Button(Vector2(600, 500), self._game_over_canvas)
+        self._highest_score_text.foreground_color = (0,0,0,0)
+
+        self._new_record_text = core.core_components.Button(Vector2(600, 650), self._game_over_canvas)
+        self._new_record_text.text = ""
+        self._new_record_text.foreground_color = (0,0,0,0)
+
+
         self._game_over_canvas.hide()
 
         self._ai_count = 0
@@ -935,16 +945,16 @@ class GameManager(core.entity_system.ScriptableComponent):
         self._game_grid_entity = self.world.add_entity()
         self._game_grid_entity.add_component(core.core_components.SpriteRenderer)
         self._game_grid: GameGrid = self._game_grid_entity.add_component(GameGrid)
-        self._game_grid.generate_grid(Vector2(17, 17), Vector2(32, 32))
+        self._game_grid.generate_grid(Vector2(5, 5), Vector2(32, 32))
 
         self._player_entity = self.world.add_entity()
         self._player_entity.add_component(core.core_components.SpriteRenderer)
         self._player_controller: Player = self._player_entity.add_component(Player)
         self._player_controller.set_grid(self._game_grid, Vector2(0, 0))
 
-        self.add_AI(Vector2(0,16))
-        self.add_AI(Vector2(16, 0))
-        self.add_AI(Vector2(16, 16))
+        self.add_AI(Vector2(0,4))
+        self.add_AI(Vector2(4, 0))
+        self.add_AI(Vector2(4, 4))
 
     def load_highest_score(self):
         score_file = open("data/score.dat", "r")
@@ -967,9 +977,14 @@ class GameManager(core.entity_system.ScriptableComponent):
 
     def on_player_death(self):
         self._game_over_canvas.show()
+        self._highest_score_text.text = "Maior pontuação registrada: {} pts".format(self._highest_score)
+        self._final_score_text.text = "Sua pontuação final foi de: {} pts".format(self._current_score)
         if self._current_score > self._highest_score:
             self.save_highest_score()
+            self._new_record_text.text = "SUA PONTUAÇÃO É O NOVO RECORDE!"
+            self._new_record_text.foreground_color = (0,200,0,255)
         self.clear_current_game_state()
+        
     def create_ai_at_random_position(self):
         for x in range(self._game_grid.grid_size.x):
             for y in range(self._game_grid.grid_size.y):
