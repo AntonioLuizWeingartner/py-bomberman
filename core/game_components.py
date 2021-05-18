@@ -13,7 +13,7 @@ import core.event_system
 import core.core_components
 import core.app
 import functools
-from typing import Dict, List, Optional, MutableSet
+from typing import Callable, Dict, List, Optional, MutableSet, Tuple
 from core.math import Vector2
 
 class GridCell:
@@ -435,13 +435,14 @@ class GridAgent(GridEntity):
         self._direction: Direction = Direction.SOUTH
         self._anim_type: int = 0
         self.event_system.listen("bomb_exploded", self.return_bomb, sender=self)
+        self.sheet = "player"
 
     def return_bomb(self):
         self._bomb_count -= 1
 
     def set_grid(self, grid: GameGrid, initial_pos: Vector2):
         super().set_grid(grid, initial_pos)
-        self._sprite_renderer.sprite = self.app.image_loader.get_sheet("player")[0][2]
+        self._sprite_renderer.sprite = self.app.image_loader.get_sheet(self.sheet)[0][2]
 
     def place_entity(self):
         world_pos = self.compute_world_position(self._grid_pos)
@@ -492,25 +493,25 @@ class GridAgent(GridEntity):
     def __set_end_sprite(self):
         spr: pygame.Surface = None
         if self._direction == Direction.NORTH:
-            spr = self.app.image_loader.get_sheet("player")[0][0]
+            spr = self.app.image_loader.get_sheet(self.sheet)[0][0]
         elif self._direction == Direction.SOUTH:
-            spr = self.app.image_loader.get_sheet("player")[0][2]
+            spr = self.app.image_loader.get_sheet(self.sheet)[0][2]
         elif self._direction == Direction.EAST:
-            spr = self.app.image_loader.get_sheet("player")[0][1]
+            spr = self.app.image_loader.get_sheet(self.sheet)[0][1]
         elif self._direction == Direction.WEST:
-            spr = self.app.image_loader.get_sheet("player")[0][3]
+            spr = self.app.image_loader.get_sheet(self.sheet)[0][3]
         self._sprite_renderer.sprite = spr
 
     def on_death(self):
         self.app.sound_loader.play_sound("ai_death")
-        self.event_system.broadcast("ai_destroyed", None, self)
+        self.event_system.broadcast("ai_death", None, self.owner)
         
     def update(self):
         self.transform.position += self._mov_delta
         if(self._play_anim):
             if(time.perf_counter() - self._last_frame_tp >= self._frame_duration):
                 self._last_frame_tp = time.perf_counter()
-                self._sprite_renderer.sprite = self.app.image_loader.get_sheet("player")[self._current_anim_frame][self._anim_type]
+                self._sprite_renderer.sprite = self.app.image_loader.get_sheet(self.sheet)[self._current_anim_frame][self._anim_type]
                 self._current_anim_frame += 1
 
         if (self.transform.position - self._target_position).squared_mag <= 0.15:
@@ -756,7 +757,7 @@ class AIAgent(GridAgent):
             pass
         elif self.__state == AIAgent.AIStates.DESTROY:
             #TODO path find to player, ignoring walkability
-            path_to_player = self.find_path(self.__player._grid_pos, True, True)
+            path_to_player = self.find_path(self.__player._grid_pos, True, False)
             true_path_to_player = self.find_path(self.__player._grid_pos)
             if true_path_to_player is not None:
                 self.__wait(30)
@@ -771,8 +772,8 @@ class AIAgent(GridAgent):
                     self.place_bomb()
                     self.__seekcover(250)
             else:
-                self.place_bomb()
-                self.__seekcover(250)
+                #TODO path find to nearest walkable block, and destroy it
+                self.__seekcover(125)
 
         elif self.__state == AIAgent.AIStates.ATTACK:
             #TODO pathfind to player, considering walkability
@@ -843,7 +844,7 @@ class Player(GridAgent):
 
     def on_init(self):
         super().on_init()
-
+        self.sheet = "player_b"
         self.keyboard.register_callback(pygame.K_DOWN, Keyboard.KEY_PRESSED, self._move_down)
         self.keyboard.register_callback(pygame.K_UP, Keyboard.KEY_PRESSED, self._move_up)
         self.keyboard.register_callback(pygame.K_LEFT, Keyboard.KEY_PRESSED, self._move_left)
@@ -910,8 +911,6 @@ class GameManager(core.entity_system.ScriptableComponent):
 
         self._main_menu_button.on_click = self._game_over_to_main_menu
 
-
-
         self._game_over_text = core.core_components.Button(Vector2(600, 50), self._game_over_canvas)
         self._game_over_text.text = "GAME OVER"
         self._game_over_text.font_size = 30
@@ -924,31 +923,60 @@ class GameManager(core.entity_system.ScriptableComponent):
 
         self.event_system.listen("ai_death", self.on_ai_death)
         self.event_system.listen("player_death", self.on_player_death)
+        self._actions: List[Tuple[Callable, float]] = list()
+        self._highest_score = 0
+        self.load_highest_score()
+        self._current_score = 0
+        pygame.display.set_icon(self.app.image_loader.get_image("bomb"))
 
-    def start_game(self):
+    def start_game(self):  
         self._menu_canvas.hide()
         self._game_over_canvas.hide()
         self._game_grid_entity = self.world.add_entity()
         self._game_grid_entity.add_component(core.core_components.SpriteRenderer)
-        self._game_grid = self._game_grid_entity.add_component(GameGrid)
-        self._game_grid.generate_grid(Vector2(23, 23), Vector2(32, 32))
+        self._game_grid: GameGrid = self._game_grid_entity.add_component(GameGrid)
+        self._game_grid.generate_grid(Vector2(17, 17), Vector2(32, 32))
 
         self._player_entity = self.world.add_entity()
         self._player_entity.add_component(core.core_components.SpriteRenderer)
-        self._player_controller = self._player_entity.add_component(Player)
+        self._player_controller: Player = self._player_entity.add_component(Player)
         self._player_controller.set_grid(self._game_grid, Vector2(0, 0))
 
-        self.add_AI(Vector2(0,22))
-        self.add_AI(Vector2(22, 0))
-        self.add_AI(Vector2(22, 22))
+        self.add_AI(Vector2(0,16))
+        self.add_AI(Vector2(16, 0))
+        self.add_AI(Vector2(16, 16))
+
+    def load_highest_score(self):
+        score_file = open("data/score.dat", "r")
+        self._highest_score = float(score_file.read())
+        print("Score read {}".format(self._highest_score))
+        score_file.close()
+
+    def save_highest_score(self):
+        self.app.sound_loader.play_sound("score_beat")
+        self._highest_score = self._current_score
+        score_file = open("data/score.dat", "w")
+        score_file.write(str(self._highest_score))
+        score_file.close()
 
     def on_ai_death(self, ai_entity: core.entity_system.Entity):
         self._ai_count -= 1
         self._ai_list.remove(ai_entity)
+        self._actions.append((self.create_ai_at_random_position, time.perf_counter()+5))
+        self._current_score += 100
 
     def on_player_death(self):
-        self.clear_current_game_state()
         self._game_over_canvas.show()
+        if self._current_score > self._highest_score:
+            self.save_highest_score()
+        self.clear_current_game_state()
+    def create_ai_at_random_position(self):
+        for x in range(self._game_grid.grid_size.x):
+            for y in range(self._game_grid.grid_size.y):
+                if self._game_grid.cells[x][y].walkable and self._game_grid.explosions[x][y] is False:
+                    if Vector2(x,y).mahattan_distance(self._player_controller._grid_pos) > self._game_grid.grid_size.x/2:
+                        self.add_AI(Vector2(x,y))
+                        return
 
     def add_AI(self, grid_position: Vector2):
         self._ai_count += 1
@@ -961,8 +989,10 @@ class GameManager(core.entity_system.ScriptableComponent):
 
     def clear_current_game_state(self):
         self._ai_count = 0
+        self._current_score = 0
         self.world.mark_entity_for_deletion(self._game_grid_entity)
         self.world.mark_entity_for_deletion(self._player_entity)
+        self._actions.clear()
         for ai in self._ai_list:
             self.world.mark_entity_for_deletion(ai)
 
@@ -974,4 +1004,8 @@ class GameManager(core.entity_system.ScriptableComponent):
         pass
 
     def update(self):
-        pass
+        copy = self._actions.copy()
+        for action in copy:
+            if self.app.clock.now() >= action[1]:
+                action[0]()
+                self._actions.remove(action)

@@ -128,7 +128,7 @@ class Canvas(SpriteRenderer):
                 if isinstance(widget, Button):
                     if click_pos[0] >= (widget.position.x) and click_pos[0] <= (widget.position.x + widget.half_size.x*2) and click_pos[1] >= (widget.position.y) and click_pos[1] <= (widget.position.y +widget.half_size.y*2):
                         widget.on_click()
-
+    
     def hide(self):
         self._state = False
         self._sprite.fill((0,0,0,0))
