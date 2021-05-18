@@ -31,6 +31,7 @@ class Widget(abc.ABC):
         self.__screen_position: core.math.Vector2 = position
         self._half_size: pygame.Vector2 = None
         self._canvas = canvas
+        self._canvas.add_widget(self)
 
     @abc.abstractmethod
     def generate_surface(self) -> pygame.Surface:
@@ -53,12 +54,12 @@ class Button(Widget):
     pass
 
     def __init__(self, position: core.math.Vector2, canvas):
-        super().__init__(position, canvas)
         self.__foreground_color: Tuple[int,int,int, int] = (127,127,0,255)
         self.__text: str = "Test"
         self.__font_size: int = 16
         self.__font_color: Tuple[int,int,int,int] = (255,255,255,255)
         self.__surface_size: Tuple = (300,100)
+        super().__init__(position, canvas)
         
     def generate_surface(self) -> pygame.Surface:
         text_surface = pygame.font.SysFont("Arial", self.__font_size, bold=True).render(self.__text,True, self.__font_color)
@@ -130,7 +131,7 @@ class Canvas(SpriteRenderer):
 
     def hide(self):
         self._state = False
-        self._sprite.fill(0,0,0,0)
+        self._sprite.fill((0,0,0,0))
     
     def show(self):
         self._state = True

@@ -86,8 +86,16 @@ class Entity:
         self.__scriptables: List[ScriptableComponent] = list()
         self.__drawables: List[DrawableComponent] = list()
         self.__transform = self.add_component(Transform)
+    
+    def on_remove(self):
+        for cp in self.__components:
+            cp.on_remove()
 
+        for cp in self.__scriptables:
+            cp.on_remove()
 
+        for cp in self.__drawables:
+            cp.on_remove()
 
     def __get_target_list(self, component_type: Type) -> List[Component]:
         target_list: List[Component] = None
@@ -157,7 +165,6 @@ class World:
     def mark_entity_for_deletion(self, entity: Entity):
         self.__deletion_list.append(entity)
         
-
     def set_app(self, app: core.app.Application):
         self.__app = app
 
@@ -169,7 +176,8 @@ class World:
     def remove_entity(self, entity_instance: Entity):
         if entity_instance in self.__entities:
             self.__entities.remove(entity_instance)
-    
+            entity_instance.on_remove()
+
     def update(self):
         for entity in self.__deletion_list:
             self.remove_entity(entity)

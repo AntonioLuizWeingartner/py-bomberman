@@ -74,7 +74,7 @@ class GameGrid(core.entity_system.ScriptableComponent):
                 if (x+1) % 2 == 0 and (y+1) % 2 == 0:
                     cell = GridCell(self.app.image_loader.get_image("ob"), Vector2(x,y), self.event_system, False, False)
                 else:
-                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, True, False)   
+                    cell = GridCell(self.app.image_loader.get_image("wall"), Vector2(x,y), self.event_system, False, True)   
 
                 self.event_system.listen("cell_img_changed", self.update_grid_img, sender=cell)
                 column.append(cell)
@@ -502,9 +502,9 @@ class GridAgent(GridEntity):
         self._sprite_renderer.sprite = spr
 
     def on_death(self):
-        pass
-
-
+        self.app.sound_loader.play_sound("ai_death")
+        self.event_system.broadcast("ai_destroyed", None, self)
+        
     def update(self):
         self.transform.position += self._mov_delta
         if(self._play_anim):
@@ -524,6 +524,9 @@ class GridAgent(GridEntity):
         if(self._grid.explosions[self._grid_pos.x][self._grid_pos.y]):
             self.world.mark_entity_for_deletion(self.owner)
             self.on_death()
+
+    def on_remove(self):
+        self.event_system.broadcast("grid_agent_removed", sender=self)
 
     @property
     def firepower(self) -> int:
@@ -561,7 +564,7 @@ class AIAgent(GridAgent):
     def set_player(self, player: Player):
         self.__player = player
 
-    def find_path(self, end_pos: Vector2, ignore_walkability: bool = False):
+    def find_path(self, end_pos: Vector2, ignore_walkability: bool = False, ignore_danger: bool = False):
         open_nodes: Dict[Vector2, AIAgent.ASNode] = dict()
         closed_nodes: Dict[Vector2, AIAgent.ASNode] = dict()
         open_nodes[self._grid_pos] = AIAgent.ASNode(self._grid_pos, None, 0, 0)
@@ -583,19 +586,19 @@ class AIAgent(GridAgent):
 
             temp_pos = q.position + Vector2(0,1)
 
-            if temp_pos.y < self._grid_size.y and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and self._grid.explosions[temp_pos.x][temp_pos.y] is False and danger_grid[temp_pos.x][temp_pos.y] is False:
+            if temp_pos.y < self._grid_size.y and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and ((self._grid.explosions[temp_pos.x][temp_pos.y] is False and danger_grid[temp_pos.x][temp_pos.y] is False) or ignore_danger):
                 successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
 
             temp_pos = q.position + Vector2(0,-1)
-            if temp_pos.y >= 0 and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and self._grid.explosions[temp_pos.x][temp_pos.y] is False and danger_grid[temp_pos.x][temp_pos.y] is False:
+            if temp_pos.y >= 0 and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and ((self._grid.explosions[temp_pos.x][temp_pos.y] is False and danger_grid[temp_pos.x][temp_pos.y] is False) or ignore_danger):
                 successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
 
             temp_pos = q.position + Vector2(1,0)
-            if temp_pos.x < self._grid_size.x and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and self._grid.explosions[temp_pos.x][temp_pos.y] is False and danger_grid[temp_pos.x][temp_pos.y] is False:
+            if temp_pos.x < self._grid_size.x and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and ((self._grid.explosions[temp_pos.x][temp_pos.y] is False and danger_grid[temp_pos.x][temp_pos.y] is False) or ignore_danger):
                 successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
             
             temp_pos = q.position + Vector2(-1,0)
-            if temp_pos.x >= 0 and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and self._grid.explosions[temp_pos.x][temp_pos.y] is False and danger_grid[temp_pos.x][temp_pos.y] is False:
+            if temp_pos.x >= 0 and (self._grid.cells[temp_pos.x][temp_pos.y].walkable or (ignore_walkability and self._grid.cells[temp_pos.x][temp_pos.y].destructible)) and ((self._grid.explosions[temp_pos.x][temp_pos.y] is False and danger_grid[temp_pos.x][temp_pos.y] is False) or ignore_danger):
                 successsors.append(AIAgent.ASNode(temp_pos, q, q.g_cost+1, temp_pos.mahattan_distance(end_pos)))
 
             for succ in successsors:
@@ -742,7 +745,6 @@ class AIAgent(GridAgent):
             #TODO go towards that path until your bomb explodes
             if self._bomb_count == 0 and self.__crr_seek_cover >= self.__seek_cover_frames:
                 self.__crr_seek_cover = 0
-                print("SEEK COVER COMPLETED, GOING IDLE FOR 30 FRAMES")
                 self.__wait(1)
             else:
                 self.__crr_seek_cover += 1
@@ -750,13 +752,11 @@ class AIAgent(GridAgent):
                 if path_to_safety is not None:
                     move_dir = path_to_safety[0].position - self._grid_pos
                     self.move(move_dir)
-                else:
-                    print("WILL DIE")
 
             pass
         elif self.__state == AIAgent.AIStates.DESTROY:
             #TODO path find to player, ignoring walkability
-            path_to_player = self.find_path(self.__player._grid_pos, True)
+            path_to_player = self.find_path(self.__player._grid_pos, True, True)
             true_path_to_player = self.find_path(self.__player._grid_pos)
             if true_path_to_player is not None:
                 self.__wait(30)
@@ -843,16 +843,133 @@ class Player(GridAgent):
 
     def on_init(self):
         super().on_init()
-        self.keyboard.register_callback(pygame.K_DOWN, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(0, 1)))
-        self.keyboard.register_callback(pygame.K_UP, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(0, -1)))
-        self.keyboard.register_callback(pygame.K_LEFT, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(-1, 0)))
-        self.keyboard.register_callback(pygame.K_RIGHT, Keyboard.KEY_PRESSED, functools.partial(self.move, Vector2(1, 0)))
-        self.keyboard.register_callback(pygame.K_SPACE, Keyboard.KEY_PRESSED, functools.partial(self.place_bomb))
+
+        self.keyboard.register_callback(pygame.K_DOWN, Keyboard.KEY_PRESSED, self._move_down)
+        self.keyboard.register_callback(pygame.K_UP, Keyboard.KEY_PRESSED, self._move_up)
+        self.keyboard.register_callback(pygame.K_LEFT, Keyboard.KEY_PRESSED, self._move_left)
+        self.keyboard.register_callback(pygame.K_RIGHT, Keyboard.KEY_PRESSED, self._move_right)
+        self.keyboard.register_callback(pygame.K_SPACE, Keyboard.KEY_PRESSED, self._place_bomb_wrapper)
+
+    def _move_up(self, *args):
+        self.move(Vector2(0, -1))
+
+    def _move_down(self, *args):
+        self.move(Vector2(0, 1))
+    
+    def _move_left(self, *args):
+        self.move(Vector2(-1, 0))
+
+    def _move_right(self, *args):
+        self.move(Vector2(1, 0))
+
+    def _place_bomb_wrapper(self, *args):
+        self.place_bomb()
+
+    def on_remove(self):
+        self.keyboard.remove_callback(pygame.K_DOWN, Keyboard.KEY_PRESSED, self._move_down)
+        self.keyboard.remove_callback(pygame.K_UP, Keyboard.KEY_PRESSED, self._move_up)
+        self.keyboard.remove_callback(pygame.K_LEFT, Keyboard.KEY_PRESSED, self._move_left)
+        self.keyboard.remove_callback(pygame.K_RIGHT, Keyboard.KEY_PRESSED, self._move_right)
+        self.keyboard.remove_callback(pygame.K_SPACE, Keyboard.KEY_PRESSED, self._place_bomb_wrapper)
 
     def on_death(self):
         self.app.sound_loader.play_sound("player_death")
+        self.event_system.broadcast("player_death")
 
 class GameManager(core.entity_system.ScriptableComponent):
+
+    def on_init(self):
+        self._menu_canvas: core.core_components.Canvas = self.owner.add_component(core.core_components.Canvas)
+        self._play_button = core.core_components.Button(Vector2(600, 200), self._menu_canvas)
+        self._play_button.text = "JOGAR"
+        self._play_button.foreground_color = (0, 210, 210, 255)
+
+        self._quit_button = core.core_components.Button(Vector2(600, 350), self._menu_canvas)
+        self._quit_button.text = "SAIR"
+        self._quit_button.foreground_color = (0, 180, 180, 255)
+
+        self._main_text = core.core_components.Button(Vector2(600, 50), self._menu_canvas)
+        self._main_text.text = "py-BOMBERMAN"
+        self._main_text.font_size = 50
+        self._main_text.foreground_color = (0,0,0,0)
+        self._main_text.size = (600,300)
+        
+        self._play_button.on_click = self.start_game
+        self._quit_button.on_click = lambda: exit(0)
+
+        self._game_over_canvas: core.core_components.Canvas = self.owner.add_component(core.core_components.Canvas)
+        self._retry_button = core.core_components.Button(Vector2(600, 200), self._game_over_canvas)
+        self._retry_button.text = "TENTAR NOVAMENTE"
+        self._retry_button.foreground_color = (0, 210, 210, 255)
+        self._retry_button.on_click = self.start_game
+
+        self._main_menu_button = core.core_components.Button(Vector2(600, 350), self._game_over_canvas)
+        self._main_menu_button.text = "VOLTAR PARA O MENU PRINCIPAL"
+        self._main_menu_button.foreground_color = (0, 210, 210, 255)
+
+        self._main_menu_button.on_click = self._game_over_to_main_menu
+
+
+        self._game_over_text = core.core_components.Button(Vector2(600, 50), self._game_over_canvas)
+        self._game_over_text.text = "GAME OVER"
+        self._game_over_text.font_size = 30
+        self._game_over_text.foreground_color = (0,0,0,0)
+
+        self._game_over_canvas.hide()
+
+        self._ai_count = 0
+        self._ai_list: List[core.entity_system.Entity] = list()
+
+        self.event_system.listen("ai_death", self.on_ai_death)
+        self.event_system.listen("player_death", self.on_player_death)
+
+    def start_game(self):
+        self._menu_canvas.hide()
+        self._game_over_canvas.hide()
+        self._game_grid_entity = self.world.add_entity()
+        self._game_grid_entity.add_component(core.core_components.SpriteRenderer)
+        self._game_grid = self._game_grid_entity.add_component(GameGrid)
+        self._game_grid.generate_grid(Vector2(23, 23), Vector2(32, 32))
+
+        self._player_entity = self.world.add_entity()
+        self._player_entity.add_component(core.core_components.SpriteRenderer)
+        self._player_controller = self._player_entity.add_component(Player)
+        self._player_controller.set_grid(self._game_grid, Vector2(0, 0))
+
+        self.add_AI(Vector2(0,22))
+        self.add_AI(Vector2(22, 0))
+        self.add_AI(Vector2(22, 22))
+
+    def on_ai_death(self, ai_entity: core.entity_system.Entity):
+        self._ai_count -= 1
+        self._ai_list.remove(ai_entity)
+
+    def on_player_death(self):
+        self.clear_current_game_state()
+        self._game_over_canvas.show()
+
+    def add_AI(self, grid_position: Vector2):
+        self._ai_count += 1
+        ai_entity = self.world.add_entity()
+        ai_entity.add_component(core.core_components.SpriteRenderer)
+        ai_agent = ai_entity.add_component(AIAgent)
+        ai_agent.set_grid(self._game_grid, grid_position)
+        ai_agent.set_player(self._player_controller)
+        self._ai_list.append(ai_entity)
+
+    def clear_current_game_state(self):
+        self._ai_count = 0
+        self.world.mark_entity_for_deletion(self._game_grid_entity)
+        self.world.mark_entity_for_deletion(self._player_entity)
+        for ai in self._ai_list:
+            self.world.mark_entity_for_deletion(ai)
+
+    def _game_over_to_main_menu(self):
+        self._game_over_canvas.hide()
+        self._menu_canvas.show()
+
+    def process_game_state(self):
+        pass
 
     def update(self):
         pass

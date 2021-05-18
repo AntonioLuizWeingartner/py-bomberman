@@ -29,7 +29,7 @@ class EventSystem:
         """
         message = message + str(id(sender)) if sender is not None else message
         if message in self.__registered_methods:
-            if callback in self.__registered_methods:
+            if callback in self.__registered_methods[message]:
                 self.__registered_methods[message].remove(callback)
                 if not self.__registered_methods[message]:
                     del self.__registered_methods[message]
