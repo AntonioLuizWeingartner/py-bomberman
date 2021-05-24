@@ -6,7 +6,7 @@ This game was developed at the 2nd semester of my graduation. It uses PyGame for
 This game was inspired by the original bomberman game that was launched back in 1983 by **Hudson Soft**. The mechanics of my game are similar to the original bomberman, but the goal is different: here the player must eliminate as much enemies as possible before it eventually gets hit by the computer controlled enemies.
 <br/>
 # DETAILS ABOUT THE GAME AI :robot:
-The game's AI uses **A* pathfinding algorithm**, **Flood Fill algorithm** and a **state machine** to control it's behaviour
+The game's AI uses __A* pathfinding algorithm__, **Flood Fill algorithm** and a **state machine** to control it's behaviour
 <br/>
 # HOW TO PLAY 🎮
 First, download or clone this repository to your machine. This game should run on any machine that supports python >= 3.7.x.<br/>
