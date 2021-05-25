@@ -1,6 +1,6 @@
 # PY-BOMBERMAN
 # ABOUT THE PROJECT :clipboard:
-This game was developed at the 2nd semester of my graduation. It uses PyGame for rendering and an Entity-Component organization for logic. My Entity-Component organization isn't an entity component system (ECS). In my implementation, components are containers for both logic and data, so it can't be categorized as an entity component system. Also, my logic system isn't cache-friendly so it can't handle a large amount of entities.
+This game was developed at the 2nd semester of my graduation. It uses PyGame for rendering and an Entity-Component organization for logic the game's logic. My Entity-Component organization isn't an entity component system (ECS). In my implementation, components are containers for both logic and data, so it can't be categorized as an entity component system. Also, my logic system isn't cache-friendly so it can't handle a large amount of entities.
 <br/>
 # ABOUT THE GAME 💣
 This game was inspired by the original bomberman game that was launched back in 1983 by **Hudson Soft**. The mechanics of my game are similar to the original bomberman, but the goal is different: here the player must eliminate as much enemies as possible before it eventually gets hit by the computer controlled enemies.
