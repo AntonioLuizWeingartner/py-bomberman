@@ -511,7 +511,7 @@ class GridAgent(GridEntity):
         if(self._play_anim):
             if(time.perf_counter() - self._last_frame_tp >= self._frame_duration):
                 self._last_frame_tp = time.perf_counter()
-                self._sprite_renderer.sprite = self.app.image_loader.get_sheet(self.sheet)[self._current_anim_frame][self._anim_type]
+                self._sprite_renderer.sprite = self.app.image_loader.get_sheet(self.sheet)[0][self._anim_type]
                 self._current_anim_frame += 1
 
         if (self.transform.position - self._target_position).squared_mag <= 0.15:
