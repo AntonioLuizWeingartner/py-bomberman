@@ -15,8 +15,4 @@ After downloading the repository, run the file game.py with your interpreter and
 ### CONTROLS
 The controls are fairly simple: Use your keyboard arrow keys to move around the map and the space bar to place bombs. Black blocks are indestructible and gray blocks are destructible.
 
-# SCREENSHOTS
-
-
-
 
