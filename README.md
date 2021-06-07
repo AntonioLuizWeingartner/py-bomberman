@@ -13,6 +13,6 @@ First, download or clone this repository to your machine. This game should run o
 After downloading the repository, run the file game.py with your interpreter and the game should be launched. If everything went right, you should now be seeing an interface with two light-blue buttons. Click the button with the text *'PLAY'* to start the game.
 <br />
 ### CONTROLS
-The controls are fairly simple: Use your keyboard arrow keys to move around the map and the space bar to place bombs. Black blocks are indestructible and gray blocks are destructible.
+The controls are fairly simple: Use your keyboard's arrow keys to move around the map and the space bar to place bombs. Black blocks are indestructible and gray blocks are destructible.
 
 
