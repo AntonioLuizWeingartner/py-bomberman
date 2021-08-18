@@ -1,4 +1,3 @@
-# PY-BOMBERMAN
 # ABOUT THE PROJECT :clipboard:
 This game was developed at the 2nd semester of my graduation. It uses PyGame for rendering and an Entity-Component organization for the game's logic. My Entity-Component organization isn't an entity component system (ECS). In my implementation, components are containers for both logic and data, so it can't be categorized as an entity component system. Also, my logic system isn't cache-friendly so it can't handle a large amount of entities.
 <br/>
